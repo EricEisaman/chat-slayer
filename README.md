@@ -1,4 +1,4 @@
-# @heusalagroup/hghs
+# Chat Slayer
 
 *HG HomeServer* ***will be*** a zero dep [Matrix.org](https://matrix.org) HomeServer 
 written in pure TypeScript.
