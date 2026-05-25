@@ -6,7 +6,7 @@ Chat Slayer can restrict which applications may call Matrix client APIs. Each re
 X-Chat-Slayer-Client-Id: <your-client-id>
 ```
 
-Render health checks (`GET /health`) and demo static assets (`GET /`, `/demo.css`, `/assets/*`, `/demo-config.json`) are exempt and do not need this header. Demo **API** routes (`GET /demo/stream`, `POST /demo/actions/*`) require `X-Chat-Slayer-Client-Id` when enforcement is on (same as Matrix APIs).
+Render health checks (`GET /health`) and demo static assets (`GET /`, `/demo.css`, `/assets/*`, `/demo-config.json`, `/favicon.ico`, `/e2ee.mjs`, `/crypto-sdk/*`) are exempt and do not need this header. Demo **API** routes (`GET /demo/stream`, `POST /demo/actions/*`) require `X-Chat-Slayer-Client-Id` when enforcement is on (same as Matrix APIs).
 
 ## Environment variables
 
@@ -25,7 +25,7 @@ Render health checks (`GET /health`) and demo static assets (`GET /`, `/demo.css
 {
   "id": "web-demo",
   "label": "Demo web UI",
-  "origins": ["http://localhost:5173", "https://myapp.example.com"],
+  "origins": ["http://localhost:8008", "https://myapp.example.com"],
   "allowWithoutOrigin": false
 }
 ```
@@ -106,7 +106,13 @@ Source: [demo/](demo/) — served at `/` on the same process as the API. Uses [D
 npm run dev
 ```
 
-Open http://localhost:8008/. Use **Register** or **Login** with optional `BACKEND_INITIAL_USERS`. The browser does **not** poll Matrix `/sync`; one `GET /demo/stream` SSE connection receives live updates. The access token is sent as `Authorization: Bearer …` (not in the URL).
+Open http://localhost:8008/ on the **same origin** as the API. Use **Register** or **Login** with optional `BACKEND_INITIAL_USERS` (password must match seed, e.g. `alice:devpass123`).
+
+**Live updates:** room list and inbox use **Datastar SSE** (`GET /demo/stream`, `cs` patches) — not Matrix `/sync` polling for the UI.
+
+**Optional E2EE:** [`demo/e2ee.mjs`](demo/e2ee.mjs) may call `GET /_matrix/client/r0/sync` for Olm/Megolm device keys only. Sends use `POST /demo/actions/send` with optional `X-Demo-Encrypted-Event`. Requires `npm run build:demo` (copies `crypto-sdk/`). See [demo/README.md](demo/README.md).
+
+The access token is sent as `Authorization: Bearer …` (not in the URL).
 
 | Demo route | Purpose |
 |------------|---------|
@@ -121,6 +127,20 @@ Open http://localhost:8008/. Use **Register** or **Login** with optional `BACKEN
 SSE `cs.name` values: `room-directory`, `room-message`, `session`, `error`.
 
 Optional env: `DEMO_SSE_INACTIVE_RESYNC_MINUTES`, `DEMO_SSE_IDLE_CHECK_INTERVAL_MS`, `DEMO_SSE_KEEPALIVE` (see [demo/README.md](demo/README.md)).
+
+### Demo action headers (same-origin browser)
+
+The demo UI often sends these on `POST /demo/actions/*` (in addition to Datastar signal bodies) to avoid signal sync races:
+
+| Header | Purpose |
+|--------|---------|
+| `X-Demo-Room-Id` | Active room for join/send |
+| `X-Demo-Room-Name` | Create-room display name |
+| `X-Demo-Room-Names` | Comma-separated names for register-rooms |
+| `X-Demo-Message` | Plaintext message (when not using E2EE) |
+| `X-Demo-Encrypted-Event` | JSON encrypted event body from `e2ee.mjs` |
+
+Same-origin requests to `http://localhost:8008/` do not need extra CORS configuration for these headers.
 
 Matrix REST (`/_matrix/client/...`) remains available for programmatic clients (curl, SDKs) with `X-Chat-Slayer-Client-Id`.
 
@@ -161,7 +181,7 @@ Registration follows the [Matrix Client-Server API](https://spec.matrix.org/late
 
 Common errcodes: `M_USER_IN_USE` (409), `M_INVALID_USERNAME` (400). Sending `auth.type` of `m.login.password` on register returns **400** (`M_UNKNOWN`).
 
-Optional seed users (local demo only): `BACKEND_INITIAL_USERS=alice:devpassword` in `.env` — not required for open registration.
+Optional seed users (local demo only): `BACKEND_INITIAL_USERS=alice:devpass123` in `.env` — matches the demo form default password. Not required for open registration.
 
 ### curl (step 1 + 2)
 
@@ -191,7 +211,7 @@ Login:
 curl -s -X POST "http://localhost:8008/_matrix/client/r0/login" \
   -H "Content-Type: application/json" \
   -H "X-Chat-Slayer-Client-Id: ops-cli" \
-  -d '{"type":"m.login.password","identifier":{"type":"m.id.user","user":"alice"},"password":"devpassword"}'
+  -d '{"type":"m.login.password","identifier":{"type":"m.id.user","user":"alice"},"password":"devpass123"}'
 ```
 
 Without the header (when enforcement is on):

@@ -39,8 +39,23 @@
     data-computed:tutorialStep="!$accessToken ? 1 : !$streamReady ? 2 : $rooms.length === 0 ? 3 : !$roomId ? 4 : 5"
     data-computed:tutorialDone="$inbox.length > 0"
   >
+    <button
+      id="send-post-proxy"
+      type="button"
+      hidden
+      tabindex="-1"
+      aria-hidden="true"
+      data-on:click="@post('/demo/actions/send', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo', 'X-Demo-Room-Id': window.__csSendDetail?.roomId ?? '', 'X-Demo-Encrypted-Event': window.__csSendDetail?.encrypted ?? '', 'X-Demo-Message': window.__csSendDetail?.plaintext ?? '' } })"
+    ></button>
     <main class="tutorial">
       <header class="tutorial-hero">
+        <img
+          class="tutorial-hero-logo"
+          src="/assets/chat-slayer-logo.png"
+          width="584"
+          height="567"
+          alt="Chat Slayer"
+        />
         <h1>Chat Slayer</h1>
       </header>
 
@@ -299,8 +314,7 @@
                 <button
                   type="button"
                   class="primary"
-                  data-on:click="window.ChatSlayerE2ee?.queueSend()"
-                  data-on:csSendReady__window="@post('/demo/actions/send', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo', 'X-Demo-Room-Id': evt.detail.roomId, 'X-Demo-Encrypted-Event': evt.detail.encrypted, 'X-Demo-Message': evt.detail.plaintext } })"
+                  data-on:click="window.ChatSlayerE2ee ? window.ChatSlayerE2ee.queueSend() : window.queueSendPlain()"
                 >
                   Send
                 </button>

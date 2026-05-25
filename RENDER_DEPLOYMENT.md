@@ -9,7 +9,7 @@ This guide matches the repo’s [render.yaml](render.yaml) blueprint and how the
 | **One HTTP port** | Listens on `0.0.0.0` and `process.env.PORT` (injected by Render). Do **not** set `PORT` in the Dashboard. |
 | **No second port** | `FEDERATION_ENABLED=false` in `render.yaml` (Matrix federation listener stays off). |
 | **Ephemeral disk** | Matrix state is in-memory; redeploys and restarts clear users/rooms. Plan for `BACKEND_INITIAL_USERS` to re-seed if needed. |
-| **Service sleeps when idle** | First request after ~15 min idle can take 30–60s (cold start). Health check path `/` is used by Render. |
+| **Service sleeps when idle** | First request after ~15 min idle can take 30–60s (cold start). Health check path `/health` (see [render.yaml](render.yaml)). |
 | **512 MB RAM** | Single Node process + bundled deps; avoid enabling federation or extra listeners. |
 | **HTTPS at the edge** | Set `BACKEND_PUBLIC_URL` to `https://<your-service>.onrender.com` (required in production). |
 
@@ -98,6 +98,8 @@ npm test
 npm run build
 ```
 
+If local port 8008 is stuck after a dev session: `npm run pkill`.
+
 See [STYLEGUIDE.md](STYLEGUIDE.md) and [README.md](README.md) for the Google TypeScript Style Guide tooling (`npm run fix` for formatting).
 
 ## Health checks
@@ -123,6 +125,7 @@ NODE_ENV=production \
 BACKEND_JWT_SECRET="$(openssl rand -base64 48)" \
 BACKEND_PUBLIC_URL=https://chat-slayer.onrender.com \
 BACKEND_HOSTNAME=chat-slayer.onrender.com \
+ALLOWED_CLIENTS='[{"id":"web-demo","origins":["http://localhost:8008"],"allowWithoutOrigin":false}]' \
 FEDERATION_ENABLED=false \
 node dist/chat-slayer.cjs
 ```
@@ -144,13 +147,13 @@ curl -s http://127.0.0.1:10000/
 
 ## Allowed clients on Render
 
-Production enforces the client gate by default. Add `ALLOWED_CLIENTS` in the Dashboard, for example:
+Production enforces the client gate by default. The **built-in demo UI** is served from the **same** web service at `https://<your-service>.onrender.com/` (not a separate static site). Example `ALLOWED_CLIENTS`:
 
 ```json
 [
   {
     "id": "web-demo",
-    "origins": ["https://your-static-ui.onrender.com"],
+    "origins": ["https://your-service.onrender.com"],
     "allowWithoutOrigin": false
   },
   {
@@ -158,12 +161,13 @@ Production enforces the client gate by default. Add `ALLOWED_CLIENTS` in the Das
     "allowWithoutOrigin": true
   }
 ]
-
 ```
 
-- Browser UIs must use HTTPS origins that match your hosted UI URL.
+Replace `your-service` with your Render hostname. The server also adds `BACKEND_PUBLIC_URL` to `web-demo` origins when that client is listed.
+
+- External browser UIs need their exact HTTPS origin in `origins`.
 - Scripts use `X-Chat-Slayer-Client-Id: ops-cli` without an `Origin` header when `allowWithoutOrigin` is `true`.
-- `GET /health` does not require a client id; the demo at `GET /` does not require `X-Chat-Slayer-Client-Id` (Matrix API routes still do).
+- `GET /health` and static demo assets do not require a client id; Matrix API routes and demo API routes do when enforcement is on.
 
 Full details: [CLIENT_GUIDE.md](CLIENT_GUIDE.md).
 

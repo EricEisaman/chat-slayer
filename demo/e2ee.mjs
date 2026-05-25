@@ -1,6 +1,6 @@
 /**
  * Browser E2EE for the demo (Olm/Megolm via @matrix-org/matrix-sdk-crypto-wasm).
- * Queues encrypted sends through Datastar @post via a custom event.
+ * Encrypts when possible, then triggers Datastar @post via #send-post-proxy.
  */
 import {
   initAsync,
@@ -17,8 +17,6 @@ import {
 
 const CLIENT_HEADER = 'X-Chat-Slayer-Client-Id';
 const CLIENT_ID = 'web-demo';
-const SEND_READY = 'csSendReady';
-
 /** @type {import('./crypto-sdk/pkg/matrix_sdk_crypto_wasm.d.ts').OlmMachine | undefined} */
 let machine;
 let session = {
@@ -29,6 +27,28 @@ let session = {
 let wasmReady;
 let decryptBusy = false;
 let cryptoInitError = '';
+let lastSessionKey = '';
+let lastPreparedRoomId = '';
+let prepareRoomInFlight = null;
+
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    }),
+  ]);
+}
+
+function fireDatastarSend(roomId, encrypted, plaintext) {
+  window.__csSendDetail = {roomId, encrypted, plaintext};
+  const proxy = document.getElementById('send-post-proxy');
+  if (!proxy) {
+    console.error('ChatSlayerE2ee: missing #send-post-proxy');
+    return;
+  }
+  proxy.click();
+}
 
 async function matrixAuthFetch(path, init = {}) {
   const headers = {
@@ -262,14 +282,25 @@ const ChatSlayerE2ee = {
         typeof signals.user_id === 'string' ? signals.user_id : '';
       const deviceId =
         typeof signals.device_id === 'string' ? signals.device_id : '';
-      if (token && userId && deviceId) {
-        await initCrypto(token, userId, deviceId);
-      }
       const roomId = typeof signals.roomId === 'string' ? signals.roomId : '';
-      if (roomId && machine) {
-        await prepareRoom(roomId);
+      const sessionKey = `${token}|${userId}|${deviceId}`;
+      const inboxLen = Array.isArray(signals.inbox) ? signals.inbox.length : 0;
+
+      if (token && userId && deviceId && sessionKey !== lastSessionKey) {
+        await initCrypto(token, userId, deviceId);
+        lastSessionKey = sessionKey;
+        lastPreparedRoomId = '';
       }
-      if (Array.isArray(signals.inbox) && signals.inbox.length > 0) {
+      if (roomId && machine && roomId !== lastPreparedRoomId) {
+        if (!prepareRoomInFlight) {
+          prepareRoomInFlight = prepareRoom(roomId).finally(() => {
+            prepareRoomInFlight = null;
+          });
+        }
+        await prepareRoomInFlight;
+        lastPreparedRoomId = roomId;
+      }
+      if (inboxLen > 0) {
         await runSync();
         await decryptInboxDom();
       }
@@ -279,7 +310,6 @@ const ChatSlayerE2ee = {
     }
   },
 
-  /** Datastar does not await async handlers — dispatch cs-send-ready then @post listens. */
   async queueSend() {
     const picker = document.getElementById('room-picker');
     const input = document.getElementById('send-message');
@@ -294,12 +324,16 @@ const ChatSlayerE2ee = {
 
     if (machine && session.accessToken) {
       try {
-        await prepareRoom(roomId);
+        await withTimeout(prepareRoom(roomId), 12000, 'prepareRoom');
         const payload = JSON.stringify({msgtype: 'm.text', body: text});
-        const encryptedEvent = await machine.encryptRoomEvent(
-          new RoomId(roomId),
-          'm.room.message',
-          payload,
+        const encryptedEvent = await withTimeout(
+          machine.encryptRoomEvent(
+            new RoomId(roomId),
+            'm.room.message',
+            payload,
+          ),
+          8000,
+          'encryptRoomEvent',
         );
         const parsed = JSON.parse(encryptedEvent);
         encrypted = JSON.stringify({
@@ -315,11 +349,7 @@ const ChatSlayerE2ee = {
       }
     }
 
-    window.dispatchEvent(
-      new CustomEvent(SEND_READY, {
-        detail: {roomId, encrypted, plaintext},
-      }),
-    );
+    fireDatastarSend(roomId, encrypted, plaintext);
 
     if (input && !plaintext) {
       input.value = '';
@@ -328,3 +358,16 @@ const ChatSlayerE2ee = {
 };
 
 window.ChatSlayerE2ee = ChatSlayerE2ee;
+
+/** Plaintext fallback if the module failed to load. */
+window.__csSendDetail = {roomId: '', encrypted: '', plaintext: ''};
+window.queueSendPlain = () => {
+  const picker = document.getElementById('room-picker');
+  const input = document.getElementById('send-message');
+  const roomId = picker?.value?.trim() ?? '';
+  const plaintext = input?.value?.trim() ?? '';
+  if (!roomId || !plaintext) {
+    return;
+  }
+  fireDatastarSend(roomId, '', plaintext);
+};

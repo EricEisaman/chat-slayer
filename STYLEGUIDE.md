@@ -6,8 +6,8 @@ This project follows the [Google TypeScript Style Guide](https://google.github.i
 
 | Command | Purpose |
 |---------|---------|
-| `npm run lint` | ESLint (gts + `@typescript-eslint/no-explicit-any`) |
-| `npm run fix` | ESLint auto-fix + Prettier (via `gts fix`) |
+| `npm run lint` | ESLint on `**/*.{ts,tsx}` (gts + `@typescript-eslint/no-explicit-any`; see [eslint.config.cjs](eslint.config.cjs)) |
+| `npm run fix` | `gts fix` only (format + ESLint auto-fix via gts) |
 | `npm run typecheck` | `tsc` on application sources |
 | `npm run typecheck:test` | `tsc` including `*.test.ts` |
 

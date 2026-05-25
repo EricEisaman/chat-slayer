@@ -1,16 +1,43 @@
 # Demo web client
 
-**Live interactive tutorial** at `/` (not a separate dev port): step-by-step sign-in → SSE stream → rooms → join → chat, with explorable architecture notes and CSS entry animations ([Una-style interactivity](https://una.im/2025-in-review), [`@starting-style` / `allow-discrete`](https://developer.chrome.com/blog/entry-exit-animations/)). Updates are **server-pushed over SSE only** — no Matrix `/sync` polling.
+Browser UI at `/` on the same process and port as the API (default `http://localhost:8008/`). Uses [Datastar](https://data-star.dev/) for signals and SSE; optional E2EE via [`e2ee.mjs`](e2ee.mjs) and Matrix crypto WASM from `npm run build:demo`.
+
+## What it does
+
+- **Register / login** — Matrix-backed accounts; short `POST` responses patch signals (status, session).
+- **One SSE stream per tab** — `GET /demo/stream` with `Authorization: Bearer <token>` keeps room list and inbox updated.
+- **Mutations** — create room, register room group, join, send (via `POST /demo/actions/*`).
+- **Logo** — `resources/chat-slayer-logo.png` and favicon are copied to `/assets/` on `build:demo`.
+
+Room list and inbox updates use SSE (`cs` patches). They do not use Matrix `/sync` polling. E2EE may call `/sync` only for device-key exchange.
 
 ## Run
 
-1. Copy `.env.example` to `.env` (optional `BACKEND_INITIAL_USERS=alice:devpassword` for a seed user)
-2. `npm run dev` (copies demo assets, then starts the server)
-3. Open http://localhost:8008/
+1. From repo root: copy [`.env.example`](../.env.example) to `.env` (optional `BACKEND_INITIAL_USERS=alice:devpass123`).
+2. `npm ci --include=dev`
+3. `npm run dev` (runs `build:demo`, then starts the server)
+4. Open http://localhost:8008/
 
-After **Register** or **Login**, the page opens **one** `GET /demo/stream` per tab with `Authorization: Bearer <token>` (no token in the URL). Register/login/create/join/send return **short** `POST` SSE responses that `patchSignals` (status, `roomId`, room list on create/register). Live updates stay on the **same** keepalive stream via `cs` + `rooms` / `inbox` patches — same idea as [babylon-game-starter](https://github.com/EricEisaman/babylon-game-starter) `mp` events, without reconnecting.
+If port 8008 is in use: `npm run pkill` from the repo root.
 
-All demo actions use `X-Chat-Slayer-Client-Id: web-demo` (see `ALLOWED_CLIENTS` when enforcement is on).
+All demo actions send `X-Chat-Slayer-Client-Id: web-demo` when client access is enforced — see [CLIENT_GUIDE.md](../CLIENT_GUIDE.md).
+
+## Routes
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/` | GET | Demo HTML |
+| `/demo.css`, `/assets/*`, `/favicon.ico` | GET | Static assets |
+| `/e2ee.mjs`, `/crypto-sdk/*` | GET | E2EE module + WASM |
+| `/demo-config.json` | GET | Client id and API base for the page |
+| `/demo/stream` | GET | Long-lived SSE (`Authorization: Bearer`) |
+| `/demo/actions/register` | POST | Register |
+| `/demo/actions/login` | POST | Login |
+| `/demo/actions/create-room` | POST | Create uniquely named room |
+| `/demo/actions/register-rooms` | POST | Ensure many named rooms exist |
+| `/demo/actions/join-room` | POST | Join `roomId` |
+| `/demo/actions/send` | POST | Send message (plaintext or encrypted header) |
+| `/health` | GET | Health check (no client id) |
 
 ## SSE configuration
 
@@ -20,23 +47,26 @@ All demo actions use `X-Chat-Slayer-Client-Id: web-demo` (see `ALLOWED_CLIENTS` 
 | `DEMO_SSE_IDLE_CHECK_INTERVAL_MS` | `30000` | How often idle subscribers are checked |
 | `DEMO_SSE_KEEPALIVE` | `true` | Long-lived `/demo/stream` connection |
 
-## Manual two-tab test
+## Two-tab test
 
-1. Tab A (alice): register/login, create room **Lobby**
-2. Tab B (bob): register/login — room list should show **Lobby** without refresh
-3. Bob clicks **Lobby** to join; alice sends a message — bob’s inbox updates over SSE
+1. Tab A (`alice`): register or login → create room **Sigma** (or pick an existing room).
+2. Tab B (`bob`): register or login → wait for **SSE live** → pick the same room in the dropdown (triggers join) or send (server auto-joins).
+3. Send from either tab — the other tab’s inbox should update on the open stream.
 
-## Build only
+Default demo password in the form is `devpass123` (match `BACKEND_INITIAL_USERS` if you use a seed user).
+
+## Build
 
 ```bash
-npm run build:demo   # copies index.html + demo.css → dist/demo/
-npm run build        # server bundle + demo
+npm run build:demo
 ```
 
-## Styling
+Copies to `dist/demo/`: `index.html`, `demo.css`, `e2ee.mjs`, `assets/chat-slayer-logo.png`, `assets/chat-slayer-favicon.png`, and `crypto-sdk/` (from `@matrix-org/matrix-sdk-crypto-wasm`).
 
-[`demo.css`](demo.css) uses `contrast-color()` / `color-mix()` on the status area; see the repo README for browser notes.
+```bash
+npm run build   # server bundle + build:demo
+```
 
 ## Client access
 
-When `CLIENT_ACCESS_ENFORCED=true`, list `web-demo` with your public origin (e.g. `http://localhost:8008` locally, `https://<app>.onrender.com` on Render). Demo routes: `GET|POST /demo/stream`, `POST /demo/actions/*`. See [CLIENT_GUIDE.md](../CLIENT_GUIDE.md).
+When `CLIENT_ACCESS_ENFORCED=true`, list `web-demo` with your public origin (e.g. `http://localhost:8008` locally, `https://<app>.onrender.com` on Render). See [CLIENT_GUIDE.md](../CLIENT_GUIDE.md).

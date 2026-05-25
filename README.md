@@ -1,12 +1,20 @@
-![CHATSLAYER — Slash the silence. Own the chat.](resources/chat-slayer-banner.jpg)
+![Chat Slayer](resources/chat-slayer-logo.png)
 
 # Chat Slayer
 
-*Chat Slayer* is a lightweight, zero-dep [Matrix.org](https://matrix.org) chat server written in TypeScript. It targets **cloud deployment** (e.g. Render free tier): a single Node process, **in-memory** Matrix state by default, and no separate database. You can run it on a home network, but the product model is a small hosted chat API—not a federated “homeserver” appliance.
+*Chat Slayer* is a lightweight Matrix-compatible chat server written in TypeScript. It runs as a **single Node process** with **in-memory** state by default (no separate database), bundled for deployment (e.g. Render free tier). Client apps use standard Matrix client API routes under `/_matrix/client/...`.
 
-Matrix protocol terms in the codebase (e.g. `m.homeserver` in discovery JSON) follow the spec; user-facing docs use **chat server** / **server**.
+### Documentation
 
-Shared libraries live under `src/fi/cs/` (core, matrix, backend, node). The app compiles to one standalone JavaScript bundle; the only runtime dependency is Node.js (20.19+).
+| Doc | Purpose |
+|-----|---------|
+| This file | Overview, local dev, build scripts, Docker |
+| [demo/README.md](demo/README.md) | Browser demo at `/` (Datastar SSE, actions, optional E2EE) |
+| [CLIENT_GUIDE.md](CLIENT_GUIDE.md) | `ALLOWED_CLIENTS`, `X-Chat-Slayer-Client-Id`, curl examples |
+| [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) | Production deploy on Render |
+| [STYLEGUIDE.md](STYLEGUIDE.md) | Lint, format, TypeScript conventions |
+
+Shared code lives under `src/fi/cs/` (core, matrix, backend, node). Vite builds the server entry [`src/chat-slayer.ts`](src/chat-slayer.ts) to `dist/chat-slayer.cjs`. Node **20.19+** is required at runtime.
 
 ### Configuration and secrets
 
@@ -15,68 +23,81 @@ Copy [`.env.example`](.env.example) to `.env` for local development. **Never com
 | Variable | Secret? | Notes |
 |----------|---------|-------|
 | `BACKEND_JWT_SECRET` | Yes on Render | Optional locally — a dev default is used if unset; set a 32+ char secret when `NODE_ENV=production` |
-| `BACKEND_INITIAL_USERS` | Yes | Optional `user:password` pairs, `;`-separated |
+| `BACKEND_INITIAL_USERS` | Yes | Optional `user:password` pairs, `;`-separated (demo UI defaults to `devpass123`) |
 | `BACKEND_EMAIL_CONFIG` | Often | SMTP URL may include credentials |
-| `BACKEND_PUBLIC_URL` | No | Public Matrix client URL |
+| `BACKEND_PUBLIC_URL` | No | Public URL clients use for discovery |
 | `PORT` | No | Set by Render automatically — do not override in Dashboard |
 
 Build-time constants (`BUILD_VERSION`, `BUILD_NODE_ENV`, etc.) are injected by Vite only. JWT and SMTP values are read at **runtime** from the environment.
 
-To restrict which apps may use the Matrix API, see **[CLIENT_GUIDE.md](CLIENT_GUIDE.md)** (`ALLOWED_CLIENTS`, `X-Chat-Slayer-Client-Id`, demo under [`demo/`](demo/)).
+To restrict which apps may call the API, see **[CLIENT_GUIDE.md](CLIENT_GUIDE.md)** (`ALLOWED_CLIENTS`, `X-Chat-Slayer-Client-Id`).
 
 ### Local development
 
 ```shell
 npm ci --include=dev
 cp .env.example .env
-# Edit .env — set BACKEND_JWT_SECRET to a local dev value
+# Optional: npm run pkill   # free port 8008 if a previous dev server is still running
 npm run dev
 ```
+
+`npm run dev` runs `build:demo` then starts the server with `vite-node src/chat-slayer.ts`.
+
+Open http://localhost:8008/ — demo UI and API on the same origin. The page loads `/demo-config.json` for client id and API base URL. Health checks: `GET /health`.
+
+For a two-browser smoke test, see [demo/README.md](demo/README.md).
+
+### npm scripts
+
+| Script | What it does |
+|--------|----------------|
+| `dev` | `build:demo` + `vite-node src/chat-slayer.ts` |
+| `build` | Vite server bundle + `build:demo` |
+| `build:demo` | Copy demo UI, logo/favicon, `e2ee.mjs`, crypto WASM → `dist/demo/` |
+| `start-prod` | `build:demo` + `node dist/chat-slayer.cjs` |
+| `start-prod:deploy` | Production-mode env checks + `node dist/chat-slayer.cjs` (run after `npm run build`) |
+| `pkill` | Stop processes on port 8008 and stray vite-node/chat-slayer runs |
+| `test` | Vitest-node unit tests |
+| `lint` / `fix` / `typecheck` | See [STYLEGUIDE.md](STYLEGUIDE.md) |
 
 ### Code quality (Google TypeScript Style Guide)
 
 The repo follows the [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html). See [STYLEGUIDE.md](STYLEGUIDE.md) for local notes.
 
 ```shell
-npm run lint          # ESLint (type-aware), entire src/** and demo/**
-npm run fix           # gts format + ESLint --fix
-npm run typecheck     # tsc strict (including strictNullChecks)
-npm run typecheck:test  # optional: typecheck *.test.ts
+npm run lint            # ESLint on **/*.{ts,tsx} (see eslint.config.cjs)
+npm run fix             # gts fix (format + ESLint fixes via gts)
+npm run typecheck       # tsc strict (including strictNullChecks)
+npm run typecheck:test  # typecheck *.test.ts
 ```
-
-### Demo web client
-
-The demo UI is **served by the same server** as the Matrix API (no second port or `dev:demo` script).
-
-```shell
-npm run dev
-```
-
-Open http://localhost:8008/ — the page loads `/demo-config.json` so client id and server URL match [`ALLOWED_CLIENTS`](CLIENT_GUIDE.md). Health checks use `GET /health`.
 
 ### Build and run (production bundle)
 
-**Local (simple):** after `cp .env.example .env`, run the built server — no Render secrets required:
+**Local (simple):** after `cp .env.example .env`:
 
 ```shell
 npm run build
 npm run start-prod
 ```
 
-Open http://localhost:8008/ (demo + API). JWT and client access use relaxed local defaults unless `NODE_ENV=production`.
+Open http://localhost:8008/. JWT and client access use relaxed local defaults unless `NODE_ENV=production`.
 
-**Render-like check** (strict secrets, same as deploy):
+**Production-like check** (strict env, same as Render):
 
 ```shell
+npm run build
 NODE_ENV=production \
 BACKEND_JWT_SECRET="$(openssl rand -base64 48)" \
 BACKEND_PUBLIC_URL=https://your-app.onrender.com \
+ALLOWED_CLIENTS='[{"id":"web-demo","origins":["http://localhost:8008"],"allowWithoutOrigin":false}]' \
 npm run start-prod:deploy
 ```
 
-Production output is `dist/chat-slayer.cjs` (CommonJS bundle; required because the repo uses `"type": "module"`).
+Set `ALLOWED_CLIENTS` as required in production — see [CLIENT_GUIDE.md](CLIENT_GUIDE.md).
 
-The server listens on `http://0.0.0.0:$PORT` (default port `8008` when `PORT` is unset).
+Production output is `dist/chat-slayer.cjs` (CommonJS; the repo uses `"type": "module"` for source).
+
+The server listens on `http://0.0.0.0:$PORT` (default `8008` when `PORT` is unset).
 
 ### Docker
 
@@ -87,20 +108,12 @@ docker-compose build
 docker-compose up
 ```
 
-Services:
+- http://localhost:8008 — demo UI + API
 
-- http://localhost:8008 — demo UI + Matrix client API
+### Deploy on Render
 
-### Deploy on Render (free web service)
+See **[RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)** for blueprint steps, secrets, free-tier behavior, and verification.
 
-See **[RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)** for secrets, env vars, free-tier limits, and verification.
-
-1. Connect this repository to Render (or apply [render.yaml](render.yaml)).
-2. In the Render Dashboard, add **Secret** environment variables:
-   - `BACKEND_JWT_SECRET` — strong random string
-   - Optionally `BACKEND_INITIAL_USERS`, `BACKEND_EMAIL_CONFIG`
-3. Set `BACKEND_PUBLIC_URL` to `https://<your-service>.onrender.com`.
-4. Do **not** set `PORT` — Render injects it.
-5. `FEDERATION_ENABLED` defaults to `false` (single HTTP port on free tier).
-
-**Free tier notes:** 512 MB RAM, sleeps after ~15 minutes idle (cold start ~30–60s), no persistent disk (in-memory state resets on redeploy).
+- Set `BACKEND_JWT_SECRET` (Secret) and `BACKEND_PUBLIC_URL` (`https://<your-service>.onrender.com`) in the Dashboard.
+- Do **not** set `PORT` — Render injects it.
+- Apply [render.yaml](render.yaml) or connect the repo as a Blueprint.

@@ -1,4 +1,5 @@
-import {cpSync, mkdirSync} from 'node:fs';
+import {execSync} from 'node:child_process';
+import {cpSync, existsSync, mkdirSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -17,9 +18,22 @@ for (const file of ['index.html', 'demo.css', 'e2ee.mjs']) {
   cpSync(join(demoDir, file), join(outDir, file));
 }
 
+const logoSrc = join(repoRoot, 'resources', 'chat-slayer-logo.png');
 const faviconSrc = join(repoRoot, 'resources', 'chat-slayer-favicon.png');
+
+if (existsSync(logoSrc) && process.platform === 'darwin') {
+  try {
+    execSync(`sips -z 256 256 "${logoSrc}" --out "${faviconSrc}"`, {
+      stdio: 'ignore',
+    });
+  } catch {
+    /* keep checked-in favicon */
+  }
+}
+
 const assetsDir = join(outDir, 'assets');
 mkdirSync(assetsDir, {recursive: true});
+cpSync(logoSrc, join(assetsDir, 'chat-slayer-logo.png'));
 cpSync(faviconSrc, join(assetsDir, 'chat-slayer-favicon.png'));
 
 const cryptoOut = join(outDir, 'crypto-sdk');

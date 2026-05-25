@@ -13,6 +13,7 @@
     "build": "vite build && npm run build:demo",
     "build:demo": "node demo/build.mjs",
     "dev": "npm run build:demo && vite-node src/chat-slayer.ts",
+    "pkill": "node scripts/pkill-project.mjs",
     "start": "npm run dev",
     "start-prod": "npm run build:demo && node dist/chat-slayer.cjs",
     "start-prod:deploy": "NODE_ENV=production node dist/chat-slayer.cjs"
