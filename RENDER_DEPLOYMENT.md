@@ -107,18 +107,35 @@ Paste the output into Render → Environment → `BACKEND_JWT_SECRET` → **Secr
 
 `npm ci --include=dev` is required because `NODE_ENV=production` would otherwise skip Vite (a devDependency). The production **runtime** still uses only `dependencies` after build.
 
-### Pre-deploy checks (recommended)
+### Pre-deploy (run before every push)
 
-From the repo root after `npm ci --include=dev`:
+```bash
+npm run render:deploy:test
+```
+
+This mirrors Render’s **Node 22.12 / npm 10.9** install and [render.yaml](render.yaml) production build: lockfile `npm ci`, `BUILD_NODE_ENV=production npm run build`, artifact checks, and Dockerfile runner `npm ci --omit=dev`. Use `--clean` for a cold install, `--docker` to also run `docker build`.
+
+Then generate Dashboard secrets if needed:
+
+```bash
+npm run render:gen:env
+```
+
+Optional quality gates:
 
 ```bash
 npm run lint
 npm run typecheck
 npm test
-npm run build
 ```
 
 If local port 8008 is stuck after a dev session: `npm run pkill`.
+
+Regenerate the lockfile with the same npm Render uses if step 1 fails:
+
+```bash
+rm -rf node_modules && npx -y npm@10.9.0 install
+```
 
 See [STYLEGUIDE.md](STYLEGUIDE.md) and [README.md](README.md) for the Google TypeScript Style Guide tooling (`npm run fix` for formatting).
 
@@ -158,7 +175,8 @@ curl -s http://127.0.0.1:10000/
 
 | Symptom | Likely cause | Fix |
 |---------|----------------|-----|
-| Build log shows **Dockerfile** / `npm ci` exit 1 | Service uses **Docker** runtime, not [render.yaml](render.yaml) native Node | In Dashboard → **Settings** → set **Runtime** to **Node** (or sync Blueprint with `runtime: node`). Or redeploy after updating [Dockerfile](Dockerfile) (multi-stage; copies `demo/` + `resources/`). |
+| Build log shows **Dockerfile** / `npm ci` exit 1 | Service uses **Docker** runtime, or **lockfile out of sync** with npm 10.9 | Run `npm run render:deploy:test`. If step 1 fails: `npx -y npm@10.9.0 install` and commit `package-lock.json`. Or set **Runtime** to **Node** in Dashboard. |
+| `Missing: @emnapi/core from lock file` | Lockfile generated with npm 11+ only | `rm -rf node_modules && npx -y npm@10.9.0 install`, commit lockfile, rerun `render:deploy:test`. |
 | Build fails: `vite: not found` | Dev deps skipped | Use `npm ci --include=dev` in build (already in blueprint). |
 | Immediate exit on start | Missing/weak `BACKEND_JWT_SECRET` or bad `BACKEND_PUBLIC_URL` | Set Secret JWT (32+ chars) and HTTPS public URL in Dashboard. |
 | Health check failed | App not binding to `PORT` | Remove custom `PORT` / `BACKEND_URL` overrides; redeploy. |

@@ -9,7 +9,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 # Install all deps for Vite build; do not set NODE_ENV=production before npm ci.
-RUN npm ci --include=dev
+RUN npm ci
 
 COPY tsconfig.json vite.config.ts ./
 COPY src ./src
