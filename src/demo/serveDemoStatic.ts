@@ -8,7 +8,11 @@ import {
   getAllowedClientsConfig,
 } from '../config/allowedClients';
 import {injectDemoPageMeta} from './demoPageMeta';
-import {BACKEND_PUBLIC_URL} from '../constants/runtime';
+import {BACKEND_INITIAL_ROOMS, BACKEND_PUBLIC_URL} from '../constants/runtime';
+import {
+  isPreconfiguredPrivateRoomsEnabled,
+  parseInitialRoomNames,
+} from '../config/initialRooms';
 
 const DEMO_CLIENT_ID = 'web-demo';
 
@@ -71,6 +75,7 @@ export function isDemoStaticPath(path: string): boolean {
   return (
     path.startsWith('/assets/') ||
     path === '/e2ee.mjs' ||
+    path === '/private-rooms.mjs' ||
     path.startsWith('/crypto-sdk/')
   );
 }
@@ -80,11 +85,15 @@ export function buildDemoConfigJson(): string {
   const demoClient =
     findAllowedClientById(config.clients, DEMO_CLIENT_ID) ?? config.clients[0];
   const publicOrigin = BACKEND_PUBLIC_URL.replace(/\/$/, '');
+  const preconfiguredNames = parseInitialRoomNames(BACKEND_INITIAL_ROOMS);
   return JSON.stringify(
     {
       enforced: config.enforced,
       defaultClientId: demoClient?.id ?? DEMO_CLIENT_ID,
       apiBase: publicOrigin || '',
+      privateRoomsEnabled: isPreconfiguredPrivateRoomsEnabled(
+        preconfiguredNames,
+      ),
       clients: config.clients.map((c: AllowedClientConfig) => ({
         id: c.id,
         label: c.label,

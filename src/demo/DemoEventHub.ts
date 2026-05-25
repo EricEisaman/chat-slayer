@@ -12,6 +12,7 @@ import {
   patchDemoInboxUi,
   patchDemoRoomUi,
 } from './demoRoomUiPatch';
+import {listDemoRoomsForUser} from './demoRooms';
 
 export interface DemoSseWriter {
   readonly patchSignals: (json: string) => void;
@@ -73,8 +74,8 @@ export class DemoEventHub {
     if (!server) {
       return;
     }
-    const rooms = server.listRooms();
     for (const sub of this._subscribers.values()) {
+      const rooms = listDemoRoomsForUser(server, sub.internalUserId);
       sub.writer.patchSignals(buildRoomDirectorySignalPatch(rooms));
       patchDemoRoomUi(sub.writer.patchElements.bind(sub.writer), rooms);
       sub.lastActivityAt = Date.now();
@@ -114,7 +115,7 @@ export class DemoEventHub {
     if (!server) {
       return;
     }
-    const rooms = server.listRooms();
+    const rooms = listDemoRoomsForUser(server, subscriber.internalUserId);
     const messages = server.getTimelineEventsForUser(
       subscriber.matrixUserId,
       subscriber.lastStreamPos,

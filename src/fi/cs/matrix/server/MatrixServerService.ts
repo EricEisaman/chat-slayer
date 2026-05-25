@@ -59,6 +59,8 @@ import {
 export interface RoomListEntry {
   readonly name: string;
   readonly room_id: string;
+  /** Set when the room name is listed in BACKEND_INITIAL_ROOMS and visible to this viewer. */
+  readonly preconfigured?: boolean;
 }
 
 export interface RegisterRoomEntry {
@@ -158,6 +160,11 @@ export class MatrixServerService {
   private readonly _txnEventIds = new Map<string, string>();
   private _nextStreamPos = 1;
   private _nextEventNumericId = 1;
+  private _preconfiguredPrivateNames = new Set<string>();
+  private readonly _discoveredPreconfiguredByUser = new Map<
+    string,
+    Set<string>
+  >();
 
   /**
    *
@@ -201,13 +208,163 @@ export class MatrixServerService {
     this._eventHooks = hooks;
   }
 
+  public setPreconfiguredPrivateRoomNames(
+    normalizedDisplayNames: ReadonlySet<string>,
+  ): void {
+    this._preconfiguredPrivateNames = new Set(normalizedDisplayNames);
+  }
+
+  public isPreconfiguredPrivateRoomsEnabled(): boolean {
+    return this._preconfiguredPrivateNames.size > 0;
+  }
+
+  public isPreconfiguredPrivateName(displayName: string): boolean {
+    const trimmed = displayName.trim();
+    if (!trimmed) {
+      return false;
+    }
+    return this._preconfiguredPrivateNames.has(
+      normalizeRoomDisplayName(trimmed),
+    );
+  }
+
+  private markPreconfiguredDiscovered(
+    internalUserId: string,
+    normalizedName: string,
+  ): void {
+    let discovered = this._discoveredPreconfiguredByUser.get(internalUserId);
+    if (!discovered) {
+      discovered = new Set();
+      this._discoveredPreconfiguredByUser.set(internalUserId, discovered);
+    }
+    discovered.add(normalizedName);
+  }
+
+  private isPreconfiguredDiscoveredByUser(
+    internalUserId: string,
+    normalizedName: string,
+  ): boolean {
+    return (
+      this._discoveredPreconfiguredByUser
+        .get(internalUserId)
+        ?.has(normalizedName) ?? false
+    );
+  }
+
+  /**
+   * Unscoped room list (tests/admin). Never includes preconfigured private rooms.
+   */
   public listRooms(): readonly RoomListEntry[] {
     const entries: RoomListEntry[] = [];
     for (const [roomId, displayName] of this._roomDisplayNameByRoomId) {
+      const normalized = normalizeRoomDisplayName(displayName);
+      if (this._preconfiguredPrivateNames.has(normalized)) {
+        continue;
+      }
       entries.push({name: displayName, room_id: roomId});
     }
     entries.sort((a, b) => a.name.localeCompare(b.name));
     return entries;
+  }
+
+  public listRoomsForUser(internalUserId: string): readonly RoomListEntry[] {
+    const entries: RoomListEntry[] = [];
+    for (const [roomId, displayName] of this._roomDisplayNameByRoomId) {
+      const normalized = normalizeRoomDisplayName(displayName);
+      const isPreconfigured = this._preconfiguredPrivateNames.has(normalized);
+      if (
+        isPreconfigured &&
+        !this.isPreconfiguredDiscoveredByUser(internalUserId, normalized)
+      ) {
+        continue;
+      }
+      entries.push({
+        name: displayName,
+        room_id: roomId,
+        ...(isPreconfigured ? {preconfigured: true} : {}),
+      });
+    }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    return entries;
+  }
+
+  /**
+   * Ensures a preconfigured private room exists and marks it discovered for the caller.
+   */
+  public discoverPreconfiguredPrivateRoom(
+    userId: string,
+    deviceId: string,
+    displayName: string,
+  ): RegisterRoomEntry {
+    const trimmed = displayName.trim();
+    if (!trimmed) {
+      throw new MatrixRegistrationError(
+        MatrixErrorCode.M_UNKNOWN,
+        'Room name is required',
+        400,
+      );
+    }
+    const normalized = normalizeRoomDisplayName(trimmed);
+    if (!this._preconfiguredPrivateNames.has(normalized)) {
+      throw new MatrixRegistrationError(
+        MatrixErrorCode.M_UNKNOWN,
+        'Unknown room name',
+        404,
+      );
+    }
+    const entry = this.ensureRoom(
+      userId,
+      deviceId,
+      this._defaultRoomVersion,
+      MatrixVisibility.PRIVATE,
+      trimmed,
+    );
+    if (entry.created) {
+      this._eventHooks.onRoomCreated?.();
+    }
+    return entry;
+  }
+
+  private normalizedDisplayNameForRoomId(
+    roomId: MatrixRoomId,
+  ): string | undefined {
+    const displayName = this._roomDisplayNameByRoomId.get(roomId);
+    if (!displayName) {
+      return undefined;
+    }
+    return normalizeRoomDisplayName(displayName);
+  }
+
+  private isPreconfiguredRoomId(roomId: MatrixRoomId): boolean {
+    const normalized = this.normalizedDisplayNameForRoomId(roomId);
+    return (
+      normalized !== undefined &&
+      this._preconfiguredPrivateNames.has(normalized)
+    );
+  }
+
+  /**
+   * Preconfigured rooms require the user to have submitted the matching name first.
+   * Uses a generic not-found response so room ids cannot be probed.
+   */
+  public assertUserCanAccessRoom(
+    internalUserId: string,
+    roomId: MatrixRoomId,
+  ): void {
+    if (!this.isPreconfiguredRoomId(roomId)) {
+      return;
+    }
+    const normalized = this.normalizedDisplayNameForRoomId(roomId);
+    if (
+      !normalized ||
+      !this.isPreconfiguredDiscoveredByUser(internalUserId, normalized)
+    ) {
+      throw new MatrixRegistrationError(
+        MatrixErrorCode.M_UNKNOWN,
+        'Room not found',
+        404,
+      );
+    }
   }
 
   public findRoomIdByDisplayName(displayName: string): MatrixRoomId | undefined {
@@ -216,6 +373,30 @@ export class MatrixServerService {
       return undefined;
     }
     return this._roomNameByNormalizedName.get(normalizeRoomDisplayName(trimmed));
+  }
+
+  /**
+   * Resolves a display name only when the viewer has discovered that preconfigured room.
+   */
+  public findRoomIdByDisplayNameForUser(
+    internalUserId: string,
+    displayName: string,
+  ): MatrixRoomId | undefined {
+    const trimmed = displayName.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const normalized = normalizeRoomDisplayName(trimmed);
+    const roomId = this._roomNameByNormalizedName.get(normalized);
+    if (!roomId) {
+      return undefined;
+    }
+    if (this._preconfiguredPrivateNames.has(normalized)) {
+      if (!this.isPreconfiguredDiscoveredByUser(internalUserId, normalized)) {
+        return undefined;
+      }
+    }
+    return roomId;
   }
 
   /**
@@ -238,6 +419,15 @@ export class MatrixServerService {
       );
     }
 
+    const normalized = normalizeRoomDisplayName(trimmed);
+    const isPreconfigured = this._preconfiguredPrivateNames.has(normalized);
+    const effectiveVisibility = isPreconfigured
+      ? MatrixVisibility.PRIVATE
+      : visibility;
+    if (isPreconfigured) {
+      this.markPreconfiguredDiscovered(userId, normalized);
+    }
+
     const existing = this.findRoomIdByDisplayName(trimmed);
     if (existing) {
       this.ensureCreatorJoined(userId, existing);
@@ -252,7 +442,7 @@ export class MatrixServerService {
       userId,
       deviceId,
       roomVersion,
-      visibility,
+      effectiveVisibility,
       trimmed,
     );
     return {name: trimmed, room_id: roomId, created: true};
@@ -623,6 +813,34 @@ export class MatrixServerService {
 
     if (trimmedName) {
       const normalizedName = normalizeRoomDisplayName(trimmedName);
+      const isPreconfigured =
+        this._preconfiguredPrivateNames.has(normalizedName);
+      if (isPreconfigured) {
+        this.markPreconfiguredDiscovered(userId, normalizedName);
+        const existing = this._roomNameByNormalizedName.get(normalizedName);
+        if (existing) {
+          this.ensureCreatorJoined(userId, existing);
+          const roomItem = this._roomsByMatrixId.get(existing);
+          if (!roomItem) {
+            throw new MatrixRegistrationError(
+              MatrixErrorCode.M_UNKNOWN,
+              'Room not found',
+              404,
+            );
+          }
+          return createCreateRoomResponse(existing, roomItem);
+        }
+        const result = this.allocateNamedRoom(
+          userId,
+          deviceId,
+          roomVersion,
+          MatrixVisibility.PRIVATE,
+          trimmedName,
+        );
+        this.enableRoomEncryption(result.roomId, userId);
+        this._eventHooks.onRoomCreated?.();
+        return result;
+      }
       if (this._roomNameByNormalizedName.has(normalizedName)) {
         throw new MatrixRegistrationError(
           MatrixErrorCode.M_UNKNOWN,
@@ -751,6 +969,7 @@ export class MatrixServerService {
         404,
       );
     }
+    this.assertUserCanAccessRoom(internalUserId, normalized);
     const matrixUserId = this.resolveMatrixUserId(internalUserId);
     if (!matrixUserId) {
       throw new MatrixRegistrationError(
@@ -785,6 +1004,7 @@ export class MatrixServerService {
         404,
       );
     }
+    this.assertUserCanAccessRoom(internalUserId, normalized);
     const matrixUserId = this.resolveMatrixUserId(internalUserId);
     if (!matrixUserId) {
       throw new MatrixRegistrationError(

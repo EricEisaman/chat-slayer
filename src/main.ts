@@ -17,6 +17,7 @@ import {
   BACKEND_EMAIL_CONFIG,
   BACKEND_ACCESS_TOKEN_EXPIRATION_TIME,
   BACKEND_INITIAL_USERS,
+  BACKEND_INITIAL_ROOMS,
   BACKEND_PUBLIC_URL,
   FEDERATION_URL,
   FEDERATION_ENABLED,
@@ -53,6 +54,7 @@ import {
 import {handleHttpPreRequest} from './demo/httpPreHandlers';
 import {getDemoEventHub} from './demo/DemoEventHub';
 import {setDemoMatrixServer} from './demo/DemoHttpHandler';
+import {parseInitialRoomNames} from './config/initialRooms';
 
 const LOG = LogService.createLogger('main');
 
@@ -114,6 +116,14 @@ export async function main(args: string[] = []): Promise<CommandExitStatus> {
     emailService.initialize(BACKEND_EMAIL_CONFIG);
 
     await matrixServer.initialize();
+
+    const preconfiguredRooms = parseInitialRoomNames(BACKEND_INITIAL_ROOMS);
+    matrixServer.setPreconfiguredPrivateRoomNames(preconfiguredRooms);
+    if (preconfiguredRooms.size > 0) {
+      LOG.info(
+        `Preconfigured private room names loaded (${preconfiguredRooms.size}); hidden until discovered per user`,
+      );
+    }
 
     if (BACKEND_INITIAL_USERS) {
       const users = BACKEND_INITIAL_USERS.split(';');

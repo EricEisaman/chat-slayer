@@ -14,7 +14,7 @@ const wasmPkg = join(
 );
 
 mkdirSync(outDir, {recursive: true});
-for (const file of ['index.html', 'demo.css', 'e2ee.mjs']) {
+for (const file of ['index.html', 'demo.css', 'e2ee.mjs', 'private-rooms.mjs']) {
   cpSync(join(demoDir, file), join(outDir, file));
 }
 

@@ -33,6 +33,7 @@
       src="https://cdn.jsdelivr.net/gh/starfederation/datastar@1.0.0/bundles/datastar.js"
     ></script>
     <script type="module" src="/e2ee.mjs"></script>
+    <script type="module" src="/private-rooms.mjs"></script>
   </head>
   <body
     data-signals="{
@@ -62,6 +63,14 @@
       tabindex="-1"
       aria-hidden="true"
       data-on:click="@post('/demo/actions/send', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo', 'X-Demo-Room-Id': window.__csSendDetail?.roomId ?? '', 'X-Demo-Encrypted-Event': window.__csSendDetail?.encrypted ?? '', 'X-Demo-Message': window.__csSendDetail?.plaintext ?? '' } })"
+    ></button>
+    <button
+      id="discover-room-proxy"
+      type="button"
+      hidden
+      tabindex="-1"
+      aria-hidden="true"
+      data-on:click="@post('/demo/actions/discover-private-room', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo', 'X-Demo-Room-Name': window.__csDiscoverRoomName ?? '' } })"
     ></button>
     <main class="tutorial">
       <header class="tutorial-hero">
@@ -306,16 +315,77 @@
               aria-labelledby="chat-heading"
             >
               <h2 id="chat-heading">Step 4–5 — Messages</h2>
-              <label>
-                Active room
-                <select
-                  id="room-picker"
-                  class="field room-picker"
-                  data-on:change="if (el.value) { @post('/demo/actions/join-room', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo', 'X-Demo-Room-Id': el.value } }) }"
+              <div class="active-room-label-row">
+                <label class="active-room-label" for="room-picker">
+                  Active room
+                </label>
+                <button
+                  id="room-by-name-trigger"
+                  type="button"
+                  class="room-by-name-trigger"
+                  hidden
+                  title="Room by name"
+                  aria-label="Join by room name"
                 >
-                  <option value="">Pick a room…</option>
-                </select>
-              </label>
+                  <svg
+                    class="room-by-name-trigger-icon"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill="currentColor"
+                      d="M4 2h8a1 1 0 0 1 1 1v1h1.5a.5.5 0 0 1 0 1H13v8.5a.5.5 0 0 1-1 0V13H4v1.5a.5.5 0 0 1-1 0V5H1.5a.5.5 0 0 1 0-1H3V3a1 1 0 0 1 1-1zm0 2v8h8V4H4zm2 2h1v1H6V6zm3 0h1v1H9V6zM6 9h1v1H6V9zm3 0h1v1H9V9z"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <select
+                id="room-picker"
+                class="field room-picker"
+                data-on:change="if (el.value) { @post('/demo/actions/join-room', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo', 'X-Demo-Room-Id': el.value } }) }"
+              >
+                <option value="">Pick a room…</option>
+              </select>
+              <dialog id="room-by-name-dialog" class="room-by-name-dialog">
+                <form method="dialog" class="room-by-name-dialog-form">
+                  <h3 class="room-by-name-dialog-title">Room by name</h3>
+                  <p class="hint">
+                    If you were given a room name, enter it here.
+                  </p>
+                  <label for="room-by-name-input">Room name</label>
+                  <input
+                    id="room-by-name-input"
+                    class="field"
+                    type="text"
+                    minlength="3"
+                    autocomplete="off"
+                    required
+                  />
+                  <div
+                    id="room-by-name-remembered"
+                    class="room-by-name-remembered"
+                    aria-label="Previously used room names"
+                  ></div>
+                  <div class="room-by-name-dialog-actions">
+                    <button
+                      id="room-by-name-cancel"
+                      type="button"
+                      class="secondary"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      id="room-by-name-open"
+                      type="button"
+                      class="primary"
+                    >
+                      Open room
+                    </button>
+                  </div>
+                </form>
+              </dialog>
               <fieldset>
                 <legend>Send a message</legend>
                 <label>

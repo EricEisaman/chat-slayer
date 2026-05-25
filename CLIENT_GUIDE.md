@@ -119,6 +119,7 @@ The access token is sent as `Authorization: Bearer …` (not in the URL).
 | `POST /demo/actions/register` | Register; returns SSE `patchSignals` + session |
 | `POST /demo/actions/login` | Login |
 | `POST /demo/actions/create-room` | Create uniquely named room (`roomName` signal) |
+| `POST /demo/actions/discover-private-room` | Open a preconfigured private room by exact display name (`X-Demo-Room-Name`) |
 | `POST /demo/actions/register-rooms` | Ensure many rooms exist (`roomNames` comma-separated or array); reuses existing names |
 | `POST /demo/actions/join-room` | Join selected `roomId` |
 | `POST /demo/actions/send` | Send message to `roomId` |
@@ -182,6 +183,12 @@ Registration follows the [Matrix Client-Server API](https://spec.matrix.org/late
 Common errcodes: `M_USER_IN_USE` (409), `M_INVALID_USERNAME` (400). Sending `auth.type` of `m.login.password` on register returns **400** (`M_UNKNOWN`).
 
 Optional seed users (local demo only): `BACKEND_INITIAL_USERS=alice:devpass123` in `.env` — matches the demo form default password. Not required for open registration.
+
+### Preconfigured private rooms (server-enforced)
+
+Set `BACKEND_INITIAL_ROOMS=NameOne,NameTwo` (comma-separated display names). The server **never** exposes those names in `/demo-config.json`, unscoped room listings, or another user’s SSE directory. A user only sees a room after submitting the **exact** name via `discover-private-room`, create/register with that name, or Matrix `POST /_matrix/client/r0/rooms/register` including that name.
+
+Even with a `room_id`, `join` and `send` return **404 Room not found** until that user has discovered the name. `/demo-config.json` only includes `privateRoomsEnabled: true` when the env var is set (no name list).
 
 ### curl (step 1 + 2)
 

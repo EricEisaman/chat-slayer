@@ -32,6 +32,7 @@ import {
   readEncryptedRoomEvent,
   readSendMessage,
 } from './demoActionInput';
+import {listDemoRoomsForUser} from './demoRooms';
 import {applyCorsHeaders} from '../fi/cs/node/CorsResponseContext';
 import {
   clearSseKeepalive,
@@ -174,13 +175,57 @@ async function handleRegisterRooms(
     getDemoEventHub().touchByAccessToken(accessToken);
     const created = result.rooms.filter((entry) => entry.created).length;
     const reused = result.rooms.length - created;
-    const rooms = server.listRooms();
+    const rooms = listDemoRoomsForUser(server, session.internalUserId);
     respondDemoActionSignals(
       req,
       res,
       {
         ...directoryActionSignalPatch(rooms),
         status: `Registered ${result.rooms.length} room(s): ${created} new, ${reused} already existed`,
+      },
+      rooms,
+    );
+  } catch (err) {
+    respondDemoActionError(req, res, matrixErrorToMessage(err));
+  }
+}
+
+async function handleDiscoverPrivateRoom(
+  req: IncomingMessage,
+  res: ServerResponse,
+  signals: Record<string, unknown>,
+): Promise<void> {
+  const accessToken = readSignalString(signals, 'accessToken');
+  const roomName = readCreateRoomName(req, signals);
+  if (!roomName) {
+    respondDemoActionError(req, res, 'Room name is required');
+    return;
+  }
+  try {
+    const session = await resolveDemoSession(getMatrixServer(), accessToken);
+    const server = getMatrixServer();
+    const entry = server.discoverPreconfiguredPrivateRoom(
+      session.internalUserId,
+      '',
+      roomName,
+    );
+    const joined = server.joinRoom(session.internalUserId, entry.room_id);
+    getDemoEventHub().touchByAccessToken(accessToken);
+    const rooms = listDemoRoomsForUser(server, session.internalUserId);
+    const sub = getDemoEventHub().getSubscriberByAccessToken(accessToken);
+    if (sub) {
+      getDemoEventHub().pushSnapshotToSubscriber(sub, joined);
+    }
+    respondDemoActionSignals(
+      req,
+      res,
+      {
+        ...directoryActionSignalPatch(rooms),
+        roomId: joined,
+        roomName: entry.name,
+        status: entry.created
+          ? `Opened ${entry.name} (${joined})`
+          : `Joined ${entry.name} (${joined})`,
       },
       rooms,
     );
@@ -212,7 +257,7 @@ async function handleCreateRoom(
     );
     const joined = server.joinRoom(session.internalUserId, roomId);
     getDemoEventHub().touchByAccessToken(accessToken);
-    const rooms = server.listRooms();
+    const rooms = listDemoRoomsForUser(server, session.internalUserId);
     const sub = getDemoEventHub().getSubscriberByAccessToken(accessToken);
     if (sub) {
       getDemoEventHub().pushSnapshotToSubscriber(sub, joined);
@@ -224,7 +269,9 @@ async function handleCreateRoom(
         ...directoryActionSignalPatch(rooms),
         roomId: joined,
         roomName,
-        status: `Created and joined ${roomName} (${joined})`,
+        status: server.isPreconfiguredPrivateName(roomName)
+          ? `Opened ${roomName} (${joined})`
+          : `Created and joined ${roomName} (${joined})`,
       },
       rooms,
     );
@@ -248,7 +295,8 @@ async function handleJoinRoom(
     const session = await resolveDemoSession(getMatrixServer(), accessToken);
     const joined = getMatrixServer().joinRoom(session.internalUserId, roomId);
     getDemoEventHub().touchByAccessToken(accessToken);
-    const rooms = getMatrixServer().listRooms();
+    const server = getMatrixServer();
+    const rooms = listDemoRoomsForUser(server, session.internalUserId);
     const sub = getDemoEventHub().getSubscriberByAccessToken(accessToken);
     if (sub) {
       getDemoEventHub().pushSnapshotToSubscriber(sub, joined);
@@ -513,6 +561,10 @@ export async function tryHandleDemoRequest(
     }
     if (path === '/demo/actions/create-room') {
       await handleCreateRoom(req, res, signals);
+      return true;
+    }
+    if (path === '/demo/actions/discover-private-room') {
+      await handleDiscoverPrivateRoom(req, res, signals);
       return true;
     }
     if (path === '/demo/actions/join-room') {

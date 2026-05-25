@@ -1,6 +1,7 @@
 export interface RoomListEntry {
   readonly name: string;
   readonly room_id: string;
+  readonly preconfigured?: boolean;
 }
 
 export interface MessageLine {
@@ -29,10 +30,12 @@ export function renderRoomListHtml(rooms: readonly RoomListEntry[]): string {
     return '<ul id="room-list" class="room-list"><li class="empty">No rooms yet — create or register some above.</li></ul>';
   }
   const items = rooms
-    .map(
-      (room) =>
-        `<li class="room-item"><button type="button" class="room-pick" data-on:click="@post('/demo/actions/join-room', ${joinRoomHeaders(room.room_id)})"><strong>${escapeHtml(room.name)}</strong><span class="room-id">${escapeHtml(room.room_id)}</span></button></li>`,
-    )
+    .map((room) => {
+      const preconfiguredClass = room.preconfigured
+        ? ' room-item--preconfigured-private'
+        : '';
+      return `<li class="room-item${preconfiguredClass}"><button type="button" class="room-pick" data-on:click="@post('/demo/actions/join-room', ${joinRoomHeaders(room.room_id)})"><strong>${escapeHtml(room.name)}</strong><span class="room-id">${escapeHtml(room.room_id)}</span></button></li>`;
+    })
     .join('');
   return `<ul id="room-list" class="room-list">${items}</ul>`;
 }
@@ -46,7 +49,10 @@ export function renderRoomPickerOptionsHtml(
     .map((room) => {
       const selected =
         room.room_id === selectedRoomId ? ' selected' : '';
-      return `<option value="${escapeHtml(room.room_id)}"${selected}>${escapeHtml(room.name)}</option>`;
+      const preconfiguredClass = room.preconfigured
+        ? ' class="preconfigured-private"'
+        : '';
+      return `<option value="${escapeHtml(room.room_id)}"${selected}${preconfiguredClass}>${escapeHtml(room.name)}</option>`;
     })
     .join('');
   return `<option value="">Pick a room…</option>${options}`;

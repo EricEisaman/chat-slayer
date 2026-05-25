@@ -481,6 +481,125 @@ select.field.room-picker option {
   color: #2a2238;
 }
 
+select.field.room-picker option.preconfigured-private {
+  color: #1b6b3a;
+  font-weight: 600;
+}
+
+.active-room-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+}
+
+.active-room-label-row .active-room-label {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+#room-picker {
+  margin-top: 0.2rem;
+}
+
+.room-by-name-trigger {
+  flex: 0 0 auto;
+  min-width: 1.75rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #faf8ff;
+  color: #5c4d7a;
+}
+
+.room-by-name-trigger:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.room-by-name-trigger-icon {
+  display: block;
+}
+
+.room-by-name-dialog {
+  max-width: 22rem;
+  width: calc(100% - 2rem);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.room-by-name-dialog::backdrop {
+  background: rgba(26, 18, 40, 0.35);
+}
+
+.room-by-name-dialog-form {
+  margin: 0;
+  padding: 1rem 1.1rem 1.1rem;
+}
+
+.room-by-name-dialog-title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.room-by-name-dialog--success .room-by-name-dialog-form {
+  animation: room-by-name-success 0.6s var(--ease-out);
+}
+
+@keyframes room-by-name-success {
+  0% {
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+  40% {
+    box-shadow: inset 3px 0 0 0 #2d6a4f;
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+}
+
+.room-by-name-remembered {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  min-height: 0;
+}
+
+.room-by-name-chip {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 999px;
+  border: 1px solid #9ed4b0;
+  background: #e8f7ed;
+  color: #1b6b3a;
+}
+
+.room-by-name-dialog-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  justify-content: flex-end;
+}
+
+.room-by-name-dialog-actions button {
+  flex: 0 1 auto;
+  min-width: 5rem;
+}
+
 input.field:focus-visible,
 select.field:focus-visible {
   outline: none;
@@ -594,6 +713,15 @@ button.secondary {
   border-radius: var(--radius);
   color: inherit;
   font-weight: 500;
+}
+
+.room-item--preconfigured-private .room-pick {
+  border-color: #9ed4b0;
+  background: #f0faf3;
+}
+
+.room-item--preconfigured-private .room-pick strong {
+  color: #1b6b3a;
 }
 
 .room-pick:hover {
