@@ -18,6 +18,7 @@ import {
   BACKEND_ACCESS_TOKEN_EXPIRATION_TIME,
   BACKEND_INITIAL_USERS,
   BACKEND_INITIAL_ROOMS,
+  BACKEND_PRIVATE_ROOMS,
   BACKEND_PUBLIC_URL,
   ALLOWED_CLIENTS_CONFIG,
   FEDERATION_URL,
@@ -56,7 +57,8 @@ import {
 import {handleHttpPreRequest} from './demo/httpPreHandlers';
 import {getDemoEventHub} from './demo/DemoEventHub';
 import {setDemoMatrixServer} from './demo/DemoHttpHandler';
-import {parseInitialRoomNames} from './config/initialRooms';
+import {resolvePreconfiguredRoomsConfig} from './config/initialRooms';
+import {MatrixVisibility} from './fi/cs/matrix/types/request/createRoom/types/MatrixVisibility';
 
 const LOG = LogService.createLogger('main');
 
@@ -126,14 +128,24 @@ export async function main(args: string[] = []): Promise<CommandExitStatus> {
 
     await matrixServer.initialize();
 
-    const preconfiguredRooms = parseInitialRoomNames(BACKEND_INITIAL_ROOMS);
-    matrixServer.setPreconfiguredPrivateRoomNames(preconfiguredRooms);
-    if (preconfiguredRooms.size > 0) {
+    const preconfigured = resolvePreconfiguredRoomsConfig(
+      BACKEND_INITIAL_ROOMS,
+      BACKEND_PRIVATE_ROOMS,
+    );
+    matrixServer.setPreconfiguredPublicRoomNames(preconfigured.publicNames);
+    matrixServer.setPreconfiguredPrivateRoomNames(preconfigured.privateNames);
+    if (preconfigured.publicNames.size > 0) {
       LOG.info(
-        `Preconfigured private room names loaded (${preconfiguredRooms.size}); hidden until discovered per user`,
+        `Preconfigured public rooms: ${preconfigured.publicNames.size} (boot-seeded)`,
+      );
+    }
+    if (preconfigured.privateNames.size > 0) {
+      LOG.info(
+        `Preconfigured private room names: ${preconfigured.privateNames.size} (hidden until discovered)`,
       );
     }
 
+    let bootSeedUserId: string | undefined;
     if (BACKEND_INITIAL_USERS) {
       const users = BACKEND_INITIAL_USERS.split(';');
       LOG.debug(
@@ -149,10 +161,40 @@ export async function main(args: string[] = []): Promise<CommandExitStatus> {
           LOG.debug(`Creating initial user: "${username}"`);
           const user = await matrixServer.createUser(username, password);
           LOG.info(`Created initial user: "${username}" as ID "${user.id}"`);
+          if (!bootSeedUserId) {
+            bootSeedUserId = user.id;
+          }
         }
       }
     } else {
       LOG.debug('No initial users defined. Will not create users.');
+    }
+
+    if (preconfigured.publicDisplayNames.length > 0) {
+      if (!bootSeedUserId) {
+        LOG.error(
+          'BACKEND_INITIAL_ROOMS requires BACKEND_INITIAL_USERS with at least one user:password pair to boot-seed public rooms',
+        );
+      } else {
+        const roomVersion = matrixServer.getDefaultRoomVersion();
+        let created = 0;
+        for (const displayName of preconfigured.publicDisplayNames) {
+          const entry = matrixServer.ensureRoom(
+            bootSeedUserId,
+            '',
+            roomVersion,
+            MatrixVisibility.PUBLIC,
+            displayName,
+          );
+          if (entry.created) {
+            created += 1;
+          }
+        }
+        LOG.info(
+          `Boot-seeded ${preconfigured.publicDisplayNames.length} public room(s) (${created} newly created)`,
+        );
+        getDemoEventHub().publishRoomDirectory();
+      }
     }
 
     ChatSlayerBackendController.setMatrixServer(matrixServer);

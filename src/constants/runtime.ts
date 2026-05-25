@@ -62,9 +62,14 @@ export const BACKEND_INITIAL_USERS: string | undefined = parseNonEmptyString(
   process?.env?.BACKEND_INITIAL_USERS,
 );
 
-/** Comma-separated private room display names (hidden until a user discovers each name). */
+/** Comma-separated public room display names (boot-seeded, visible to all users). */
 export const BACKEND_INITIAL_ROOMS: string | undefined = parseNonEmptyString(
   process?.env?.BACKEND_INITIAL_ROOMS,
+);
+
+/** Comma-separated private room display names (hidden until a user discovers each name). */
+export const BACKEND_PRIVATE_ROOMS: string | undefined = parseNonEmptyString(
+  process?.env?.BACKEND_PRIVATE_ROOMS,
 );
 
 function parseDemoE2eeEnabled(): boolean {

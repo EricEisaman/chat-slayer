@@ -67,6 +67,7 @@ export function isDemoStaticPath(path: string): boolean {
     path.startsWith('/assets/') ||
     path === '/e2ee.mjs' ||
     path === '/private-rooms.mjs' ||
+    path === '/room-picker.mjs' ||
     path.startsWith('/crypto-sdk/')
   );
 }

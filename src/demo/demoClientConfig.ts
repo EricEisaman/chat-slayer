@@ -5,10 +5,10 @@ import {
 } from '../config/allowedClients';
 import {
   isPreconfiguredPrivateRoomsEnabled,
-  parseInitialRoomNames,
+  parsePrivateRoomNames,
 } from '../config/initialRooms';
 import {
-  BACKEND_INITIAL_ROOMS,
+  BACKEND_PRIVATE_ROOMS,
   BACKEND_PUBLIC_URL,
   DEMO_E2EE_ENABLED,
 } from '../constants/runtime';
@@ -29,14 +29,12 @@ export function buildDemoClientConfig(): DemoClientConfig {
   const demoClient =
     findAllowedClientById(config.clients, DEMO_CLIENT_ID) ?? config.clients[0];
   const publicOrigin = BACKEND_PUBLIC_URL.replace(/\/$/, '');
-  const preconfiguredNames = parseInitialRoomNames(BACKEND_INITIAL_ROOMS);
+  const privateRoomNames = parsePrivateRoomNames(BACKEND_PRIVATE_ROOMS);
   return {
     enforced: config.enforced,
     defaultClientId: demoClient?.id ?? DEMO_CLIENT_ID,
     apiBase: publicOrigin || '',
-    privateRoomsEnabled: isPreconfiguredPrivateRoomsEnabled(
-      preconfiguredNames,
-    ),
+    privateRoomsEnabled: isPreconfiguredPrivateRoomsEnabled(privateRoomNames),
     e2eeEnabled: DEMO_E2EE_ENABLED,
     clients: config.clients.map((c: AllowedClientConfig) => ({
       id: c.id,

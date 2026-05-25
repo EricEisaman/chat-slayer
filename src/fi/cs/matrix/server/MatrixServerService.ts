@@ -59,8 +59,10 @@ import {
 export interface RoomListEntry {
   readonly name: string;
   readonly room_id: string;
-  /** Set when the room name is listed in BACKEND_INITIAL_ROOMS and visible to this viewer. */
+  /** BACKEND_PRIVATE_ROOMS — discovered private room (green UI in demo). */
   readonly preconfigured?: boolean;
+  /** BACKEND_INITIAL_ROOMS — boot-seeded public room (blue UI in demo). */
+  readonly preconfiguredPublic?: boolean;
 }
 
 export interface RegisterRoomEntry {
@@ -160,6 +162,7 @@ export class MatrixServerService {
   private readonly _txnEventIds = new Map<string, string>();
   private _nextStreamPos = 1;
   private _nextEventNumericId = 1;
+  private _preconfiguredPublicNames = new Set<string>();
   private _preconfiguredPrivateNames = new Set<string>();
   private readonly _discoveredPreconfiguredByUser = new Map<
     string,
@@ -208,10 +211,20 @@ export class MatrixServerService {
     this._eventHooks = hooks;
   }
 
+  public setPreconfiguredPublicRoomNames(
+    normalizedDisplayNames: ReadonlySet<string>,
+  ): void {
+    this._preconfiguredPublicNames = new Set(normalizedDisplayNames);
+  }
+
   public setPreconfiguredPrivateRoomNames(
     normalizedDisplayNames: ReadonlySet<string>,
   ): void {
     this._preconfiguredPrivateNames = new Set(normalizedDisplayNames);
+  }
+
+  public isPreconfiguredPublicRoomsEnabled(): boolean {
+    return this._preconfiguredPublicNames.size > 0;
   }
 
   public isPreconfiguredPrivateRoomsEnabled(): boolean {
@@ -252,7 +265,7 @@ export class MatrixServerService {
   }
 
   /**
-   * Unscoped room list (tests/admin). Never includes preconfigured private rooms.
+   * Unscoped room list (tests/admin). Never includes hidden preconfigured private rooms.
    */
   public listRooms(): readonly RoomListEntry[] {
     const entries: RoomListEntry[] = [];
@@ -271,9 +284,12 @@ export class MatrixServerService {
     const entries: RoomListEntry[] = [];
     for (const [roomId, displayName] of this._roomDisplayNameByRoomId) {
       const normalized = normalizeRoomDisplayName(displayName);
-      const isPreconfigured = this._preconfiguredPrivateNames.has(normalized);
+      const isPrivatePreconfigured =
+        this._preconfiguredPrivateNames.has(normalized);
+      const isPublicPreconfigured =
+        this._preconfiguredPublicNames.has(normalized);
       if (
-        isPreconfigured &&
+        isPrivatePreconfigured &&
         !this.isPreconfiguredDiscoveredByUser(internalUserId, normalized)
       ) {
         continue;
@@ -281,7 +297,8 @@ export class MatrixServerService {
       entries.push({
         name: displayName,
         room_id: roomId,
-        ...(isPreconfigured ? {preconfigured: true} : {}),
+        ...(isPrivatePreconfigured ? {preconfigured: true} : {}),
+        ...(isPublicPreconfigured ? {preconfiguredPublic: true} : {}),
       });
     }
     entries.sort((a, b) => a.name.localeCompare(b.name));
@@ -335,7 +352,7 @@ export class MatrixServerService {
     return normalizeRoomDisplayName(displayName);
   }
 
-  private isPreconfiguredRoomId(roomId: MatrixRoomId): boolean {
+  private isPreconfiguredPrivateRoomId(roomId: MatrixRoomId): boolean {
     const normalized = this.normalizedDisplayNameForRoomId(roomId);
     return (
       normalized !== undefined &&
@@ -351,7 +368,7 @@ export class MatrixServerService {
     internalUserId: string,
     roomId: MatrixRoomId,
   ): void {
-    if (!this.isPreconfiguredRoomId(roomId)) {
+    if (!this.isPreconfiguredPrivateRoomId(roomId)) {
       return;
     }
     const normalized = this.normalizedDisplayNameForRoomId(roomId);
@@ -391,10 +408,11 @@ export class MatrixServerService {
     if (!roomId) {
       return undefined;
     }
-    if (this._preconfiguredPrivateNames.has(normalized)) {
-      if (!this.isPreconfiguredDiscoveredByUser(internalUserId, normalized)) {
-        return undefined;
-      }
+    if (
+      this._preconfiguredPrivateNames.has(normalized) &&
+      !this.isPreconfiguredDiscoveredByUser(internalUserId, normalized)
+    ) {
+      return undefined;
     }
     return roomId;
   }
@@ -420,12 +438,16 @@ export class MatrixServerService {
     }
 
     const normalized = normalizeRoomDisplayName(trimmed);
-    const isPreconfigured = this._preconfiguredPrivateNames.has(normalized);
-    const effectiveVisibility = isPreconfigured
-      ? MatrixVisibility.PRIVATE
-      : visibility;
-    if (isPreconfigured) {
+    const isPrivatePreconfigured =
+      this._preconfiguredPrivateNames.has(normalized);
+    const isPublicPreconfigured =
+      this._preconfiguredPublicNames.has(normalized);
+    let effectiveVisibility = visibility;
+    if (isPrivatePreconfigured) {
+      effectiveVisibility = MatrixVisibility.PRIVATE;
       this.markPreconfiguredDiscovered(userId, normalized);
+    } else if (isPublicPreconfigured) {
+      effectiveVisibility = MatrixVisibility.PUBLIC;
     }
 
     const existing = this.findRoomIdByDisplayName(trimmed);
@@ -813,10 +835,17 @@ export class MatrixServerService {
 
     if (trimmedName) {
       const normalizedName = normalizeRoomDisplayName(trimmedName);
-      const isPreconfigured =
+      const isPrivatePreconfigured =
         this._preconfiguredPrivateNames.has(normalizedName);
-      if (isPreconfigured) {
-        this.markPreconfiguredDiscovered(userId, normalizedName);
+      const isPublicPreconfigured =
+        this._preconfiguredPublicNames.has(normalizedName);
+      if (isPrivatePreconfigured || isPublicPreconfigured) {
+        if (isPrivatePreconfigured) {
+          this.markPreconfiguredDiscovered(userId, normalizedName);
+        }
+        const preconfiguredVisibility = isPrivatePreconfigured
+          ? MatrixVisibility.PRIVATE
+          : MatrixVisibility.PUBLIC;
         const existing = this._roomNameByNormalizedName.get(normalizedName);
         if (existing) {
           this.ensureCreatorJoined(userId, existing);
@@ -834,7 +863,7 @@ export class MatrixServerService {
           userId,
           deviceId,
           roomVersion,
-          MatrixVisibility.PRIVATE,
+          preconfiguredVisibility,
           trimmedName,
         );
         this.enableRoomEncryption(result.roomId, userId);

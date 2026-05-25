@@ -481,9 +481,58 @@ select.field.room-picker option {
   color: #2a2238;
 }
 
-select.field.room-picker option.preconfigured-private {
+select.field.room-picker option.preconfigured-private,
+select.field.room-picker option.room-option.preconfigured-private {
   color: #1b6b3a;
   font-weight: 600;
+}
+
+select.field.room-picker option.preconfigured-public,
+select.field.room-picker option.room-option.preconfigured-public {
+  color: #2c5282;
+  font-weight: 600;
+}
+
+select.field.room-picker.room-picker--private-selected {
+  border-color: #3d9a62;
+  color: #1b6b3a;
+  font-weight: 600;
+  background-color: #f3fbf6;
+}
+
+select.field.room-picker.room-picker--public-selected {
+  border-color: #6b8fc7;
+  color: #2c5282;
+  font-weight: 600;
+  background-color: #f0f5ff;
+}
+
+select.field.room-picker.room-picker--other-selected {
+  border-color: #8a7aa8;
+  color: #2a2238;
+  font-weight: 600;
+}
+
+.room-picker-legend {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: #6b5f80;
+  line-height: 1.4;
+}
+
+.room-picker-legend-private {
+  color: #1b6b3a;
+  font-weight: 600;
+}
+
+.room-picker-legend-public {
+  color: #2c5282;
+  font-weight: 600;
+}
+
+.room-picker-legend-other {
+  color: #2a2238;
+  font-weight: 500;
 }
 
 .active-room-label-row {
@@ -722,6 +771,15 @@ button.secondary {
 
 .room-item--preconfigured-private .room-pick strong {
   color: #1b6b3a;
+}
+
+.room-item--preconfigured-public .room-pick {
+  border-color: #a8c4e8;
+  background: #f0f5ff;
+}
+
+.room-item--preconfigured-public .room-pick strong {
+  color: #2c5282;
 }
 
 .room-pick:hover {

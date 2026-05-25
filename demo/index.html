@@ -35,6 +35,7 @@
     __CS_DEMO_CONFIG_SCRIPT__
     <script type="module" src="/e2ee.mjs"></script>
     <script type="module" src="/private-rooms.mjs"></script>
+    <script type="module" src="/room-picker.mjs"></script>
   </head>
   <body
     data-signals="{
@@ -353,10 +354,18 @@
               <select
                 id="room-picker"
                 class="field room-picker"
+                aria-describedby="room-picker-legend"
                 data-on:change="if (el.value) { @post('/demo/actions/join-room', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo', 'X-Demo-Room-Id': el.value } }) }"
               >
                 <option value="">Pick a room…</option>
               </select>
+              <p id="room-picker-legend" class="room-picker-legend">
+                <span class="room-picker-legend-private">Private</span>
+                ·
+                <span class="room-picker-legend-public">Public</span>
+                ·
+                <span class="room-picker-legend-other">Your rooms</span>
+              </p>
               <dialog id="room-by-name-dialog" class="room-by-name-dialog">
                 <form method="dialog" class="room-by-name-dialog-form">
                   <h3 class="room-by-name-dialog-title">Room by name</h3>
