@@ -57,8 +57,12 @@ import {
 import {handleHttpPreRequest} from './demo/httpPreHandlers';
 import {getDemoEventHub} from './demo/DemoEventHub';
 import {setDemoMatrixServer} from './demo/DemoHttpHandler';
+import {randomBytes} from 'node:crypto';
 import {resolvePreconfiguredRoomsConfig} from './config/initialRooms';
 import {MatrixVisibility} from './fi/cs/matrix/types/request/createRoom/types/MatrixVisibility';
+
+/** Internal Matrix user used only to create boot-seeded public rooms when no seed users are configured. */
+const BOOT_SEED_MATRIX_USERNAME = '__boot_seed__';
 
 const LOG = LogService.createLogger('main');
 
@@ -171,30 +175,35 @@ export async function main(args: string[] = []): Promise<CommandExitStatus> {
     }
 
     if (preconfigured.publicDisplayNames.length > 0) {
-      if (!bootSeedUserId) {
-        LOG.error(
-          'BACKEND_INITIAL_ROOMS requires BACKEND_INITIAL_USERS with at least one user:password pair to boot-seed public rooms',
+      let publicBootUserId = bootSeedUserId;
+      if (!publicBootUserId) {
+        const bootstrap = await matrixServer.createUser(
+          BOOT_SEED_MATRIX_USERNAME,
+          randomBytes(32).toString('hex'),
         );
-      } else {
-        const roomVersion = matrixServer.getDefaultRoomVersion();
-        let created = 0;
-        for (const displayName of preconfigured.publicDisplayNames) {
-          const entry = matrixServer.ensureRoom(
-            bootSeedUserId,
-            '',
-            roomVersion,
-            MatrixVisibility.PUBLIC,
-            displayName,
-          );
-          if (entry.created) {
-            created += 1;
-          }
-        }
-        LOG.info(
-          `Boot-seeded ${preconfigured.publicDisplayNames.length} public room(s) (${created} newly created)`,
+        publicBootUserId = bootstrap.id;
+        LOG.warn(
+          'BACKEND_INITIAL_ROOMS set without BACKEND_INITIAL_USERS; boot-seeding public rooms with internal user (set BACKEND_INITIAL_USERS to control the seed account)',
         );
-        getDemoEventHub().publishRoomDirectory();
       }
+      const roomVersion = matrixServer.getDefaultRoomVersion();
+      let created = 0;
+      for (const displayName of preconfigured.publicDisplayNames) {
+        const entry = matrixServer.ensureRoom(
+          publicBootUserId,
+          '',
+          roomVersion,
+          MatrixVisibility.PUBLIC,
+          displayName,
+        );
+        if (entry.created) {
+          created += 1;
+        }
+      }
+      LOG.info(
+        `Boot-seeded ${preconfigured.publicDisplayNames.length} public room(s) (${created} newly created)`,
+      );
+      getDemoEventHub().publishRoomDirectory();
     }
 
     ChatSlayerBackendController.setMatrixServer(matrixServer);

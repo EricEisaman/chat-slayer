@@ -188,7 +188,7 @@ Optional seed users (local demo only): `BACKEND_INITIAL_USERS=alice:devpass123` 
 
 Set `BACKEND_INITIAL_ROOMS=Lobby,Town Square` (comma-separated display names). At startup, the server creates each room as **public** and joins the **first** user from `BACKEND_INITIAL_USERS`. Every authenticated user sees these rooms in the demo room list and SSE directory without a discover step.
 
-Requires at least one `user:password` pair in `BACKEND_INITIAL_USERS`. Startup logs report a **count** of public rooms (not names).
+If `BACKEND_INITIAL_USERS` is unset, public rooms are still created at startup using an internal boot user. Set seed users when you also want login accounts recreated after each deploy. Startup logs report a **count** of public rooms (not names).
 
 ### Preconfigured private rooms (server-enforced)
 
