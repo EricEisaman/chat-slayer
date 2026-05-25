@@ -1,0 +1,65 @@
+import {
+  explainNoOtherKeysInDevelopment,
+  hasNoOtherKeysInDevelopment,
+} from '../../../types/OtherKeys';
+import {
+  explainRegularObject,
+  isRegularObject,
+  objectKey,
+} from '../../../types/RegularObject';
+import {explain, explainProperty} from '../../../types/explain';
+import {explainString, isString} from '../../../types/String';
+
+export interface NewTicketCommentReadDTO {
+  readonly ticketCommentId: string;
+  readonly ticketUserId: string;
+}
+
+export function createTicketReadDTO(
+  ticketCommentId: string,
+  ticketUserId: string,
+): NewTicketCommentReadDTO {
+  return {
+    ticketCommentId,
+    ticketUserId,
+  };
+}
+
+export function isNewTicketCommentReadDTO(
+  value: unknown,
+): value is NewTicketCommentReadDTO {
+  return (
+    isRegularObject(value) &&
+    hasNoOtherKeysInDevelopment(value, ['ticketCommentId', 'ticketUserId']) &&
+    isString(objectKey(value, 'ticketCommentId')) &&
+    isString(objectKey(value, 'ticketUserId'))
+  );
+}
+
+export function explainNewTicketCommentReadDTO(value: unknown): string {
+  return explain([
+    explainRegularObject(value),
+    explainNoOtherKeysInDevelopment(value, ['ticketCommentId', 'ticketUserId']),
+    explainProperty(
+      'ticketCommentId',
+      explainString(objectKey(value, 'ticketCommentId')),
+    ),
+    explainProperty(
+      'ticketUserId',
+      explainString(objectKey(value, 'ticketUserId')),
+    ),
+  ]);
+}
+
+export function stringifyNewTicketCommentReadDTO(
+  value: NewTicketCommentReadDTO,
+): string {
+  return `NewTicketCommentReadDTO(${value})`;
+}
+
+export function parseNewTicketCommentReadDTO(
+  value: unknown,
+): NewTicketCommentReadDTO | undefined {
+  if (isNewTicketCommentReadDTO(value)) return value;
+  return undefined;
+}

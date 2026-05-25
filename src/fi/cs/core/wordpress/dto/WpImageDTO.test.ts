@@ -1,0 +1,54 @@
+import {explainWpImageDTO, isWpImageDTO} from './WpImageDTO';
+import {explainOk} from '../../types/explain';
+
+describe('WpImageDTO', () => {
+  describe('isWpImageDTO', () => {
+    it('can test valid DTO without image', () => {
+      expect(
+        isWpImageDTO({
+          thumbnail: false,
+          medium: false,
+          large: false,
+        }),
+      ).toBe(true);
+    });
+
+    it('can test valid DTO with URLs', () => {
+      expect(
+        isWpImageDTO({
+          thumbnail:
+            'https:\/\/cms.example.com\/wp-content\/uploads\/2022\/09\/omakuva-150x150.jpeg',
+          medium:
+            'https:\/\/cms.example.com\/wp-content\/uploads\/2022\/09\/omakuva-300x300.jpeg',
+          large:
+            'https:\/\/cms.example.com\/wp-content\/uploads\/2022\/09\/omakuva.jpeg',
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe('explainWpImageDTO', () => {
+    it('can explain valid DTO without image', () => {
+      expect(
+        explainWpImageDTO({
+          thumbnail: false,
+          medium: false,
+          large: false,
+        }),
+      ).toBe(explainOk());
+    });
+
+    it('can explain valid DTO with URLs', () => {
+      expect(
+        explainWpImageDTO({
+          thumbnail:
+            'https:\/\/cms.example.com\/wp-content\/uploads\/2022\/09\/omakuva-150x150.jpeg',
+          medium:
+            'https:\/\/cms.example.com\/wp-content\/uploads\/2022\/09\/omakuva-300x300.jpeg',
+          large:
+            'https:\/\/cms.example.com\/wp-content\/uploads\/2022\/09\/omakuva.jpeg',
+        }),
+      ).toBe(explainOk());
+    });
+  });
+});

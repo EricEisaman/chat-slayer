@@ -7,28 +7,38 @@
     ],
     "allowJs": true,
     "outDir": "./dist",
-    "rootDir": "./src",
-    //"declaration": true,
-    //"declarationDir": "./dist",
-    "moduleResolution": "node",
+    "rootDir": ".",
+    "moduleResolution": "bundler",
+    "ignoreDeprecations": "6.0",
     "module": "esnext",
     "strict": true,
+    "strictFunctionTypes": false,
     "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noImplicitReturns": true,
+    "useUnknownInCatchVariables": true,
+    "noImplicitOverride": true,
     "sourceMap": false,
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "strictNullChecks": false,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "typeRoots": [
       "./node_modules/@types/"
     ],
     "noEmit": true
-
   },
   "include": [
-    "./src/hghs.ts"
+    "./src/**/*.ts",
+    "./demo/**/*.ts"
+  ],
+  "exclude": [
+    "./src/fi/cs/**/*.test.ts",
+    "./src/fi/cs/**/*.system.test.ts",
+    "./src/fi/cs/**/tests/**",
+    "./src/fi/cs/**/*Tests.ts",
+    "./src/fi/cs/core/modules/**"
   ]
 }

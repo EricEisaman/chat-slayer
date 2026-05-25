@@ -1,54 +1,64 @@
 {
-  "name": "hghs",
+  "name": "chat-slayer",
   "version": "0.0.1",
-  "description": "HG HomeServer",
-  "main": "dist/hghs.js",
+  "description": "Lightweight in-memory Matrix chat server",
+  "type": "module",
+  "main": "dist/chat-slayer.cjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start-prod": "node dist/hghs.js",
-    "start": "ts-node src/hghs.ts",
-    "build": "rollup -c"
+    "lint": "eslint .",
+    "fix": "gts fix",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
+    "test": "vite-node src/config/allowedClients.test.ts && vite-node src/security/ClientAccessGate.test.ts && vite-node src/demo/demoStreamAuth.test.ts && vite-node src/demo/demoActionInput.test.ts && vite-node src/fi/cs/matrix/server/matrixRegistration.test.ts && vite-node src/fi/cs/matrix/server/roomUniqueness.test.ts && vite-node src/fi/cs/matrix/server/roomBatchRegistration.test.ts && vite-node src/fi/cs/core/requestServer/utils/RouteUtils.test.ts",
+    "build": "vite build && npm run build:demo",
+    "build:demo": "node demo/build.mjs",
+    "dev": "npm run build:demo && vite-node src/chat-slayer.ts",
+    "start": "npm run dev",
+    "start-prod": "npm run build:demo && node dist/chat-slayer.cjs",
+    "start-prod:deploy": "NODE_ENV=production node dist/chat-slayer.cjs"
   },
-  "author": "Jaakko Heusala <jhh@hg.fi>",
+  "engines": {
+    "node": ">=20.19.0 <=23.x"
+  },
+  "author": "SIGMA PRODUCTIONS",
   "license": "MIT",
   "private": true,
   "bin": {
-    "hghs": "dist/hghs.js"
+    "chat-slayer": "dist/chat-slayer.cjs"
   },
   "keywords": [
     "typescript",
     "backend",
     "rest",
     "nodejs",
-    "spring",
-    "spring-boot"
+    "matrix"
   ],
+  "dependencies": {
+    "@matrix-org/matrix-sdk-crypto-wasm": "^18.3.0",
+    "@starfederation/datastar-sdk": "^1.0.0",
+    "i18next": "^26.2.0",
+    "jws": "^4.0.1",
+    "lodash": "^4.18.1",
+    "nodemailer": "^8.0.8",
+    "reflect-metadata": "^0.2.2"
+  },
   "devDependencies": {
-    "@babel/cli": "^7.22.10",
-    "@babel/core": "^7.22.10",
-    "@babel/preset-env": "^7.22.10",
-    "@babel/preset-typescript": "^7.22.5",
-    "@rollup/plugin-babel": "^6.0.3",
-    "@rollup/plugin-commonjs": "^25.0.3",
-    "@rollup/plugin-inject": "^5.0.3",
-    "@rollup/plugin-json": "^6.0.0",
-    "@rollup/plugin-node-resolve": "^15.1.0",
-    "@rollup/plugin-replace": "^5.0.2",
-    "@rollup/plugin-typescript": "^11.1.2",
-    "@rollup/plugin-url": "^8.0.1",
-    "@types/jws": "^3.2.5",
-    "@types/lodash": "^4.14.197",
-    "@types/node": "^20.4.10",
-    "@types/nodemailer": "^6.4.9",
-    "i18next": "^23.4.4",
-    "jws": "^4.0.0",
-    "lodash": "^4.17.21",
-    "nodemailer": "^6.9.4",
-    "rollup": "^3.26.3",
-    "rollup-plugin-uglify": "github:heusalagroup/rollup-plugin-uglify",
-    "ts-node": "^10.9.1",
-    "tslib": "^2.6.1",
-    "typescript": "^5.1.6",
-    "reflect-metadata": "^0.1.13"
+    "@eslint/js": "^10.0.1",
+    "@types/jest": "^30.0.0",
+    "@types/jws": "^3.2.11",
+    "@types/lodash": "^4.17.24",
+    "@types/moment-timezone": "^0.5.13",
+    "@types/node": "^22.19.19",
+    "@types/nodemailer": "^8.0.0",
+    "eslint": "^10.4.0",
+    "glob": "^13.0.6",
+    "globals": "^17.6.0",
+    "gts": "^7.0.0",
+    "moment-timezone": "^0.6.2",
+    "tslib": "^2.8.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.4",
+    "vite": "^8.0.14",
+    "vite-node": "^6.0.0"
   }
 }

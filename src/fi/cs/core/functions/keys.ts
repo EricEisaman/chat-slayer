@@ -1,0 +1,29 @@
+import {TestCallbackNonStandard} from '../types/TestCallback';
+import {isString} from '../types/String';
+import {isArray} from '../types/Array';
+import {map} from '../functions/map';
+import {filter} from '../functions/filter';
+import {default as _isObject} from 'lodash/isObject'; // To overcome circular dependency
+
+export function keys<T extends keyof any = string>(
+  value: any,
+  isKey: TestCallbackNonStandard = isString,
+): T[] {
+  if (isArray(value)) {
+    const indexes: number[] = map(
+      value,
+      (
+        // @ts-ignore
+        item: any,
+        index: number,
+      ) => index,
+    );
+    const items: T[] = filter(indexes, (key: number) => isKey(key)) as T[];
+    return items;
+  } else if (_isObject(value)) {
+    const allKeys: (string | symbol)[] = Reflect.ownKeys(value);
+    const items = filter(allKeys, (key: string | symbol) => isKey(key)) as T[];
+    return items;
+  }
+  return [] as T[];
+}

@@ -1,0 +1,60 @@
+import {
+  explainRegularObject,
+  isRegularObject,
+  objectKey,
+} from '../types/RegularObject';
+import {
+  explainNoOtherKeysInDevelopment,
+  hasNoOtherKeysInDevelopment,
+} from '../types/OtherKeys';
+import {explainString, isString} from '../types/String';
+import {explain, explainProperty} from '../types/explain';
+import {explainStringArray, isStringArray} from '../types/StringArray';
+import {map} from '../functions/map';
+
+export interface HostEntryModel {
+  readonly address: string;
+  readonly hostnames: readonly string[];
+}
+
+export function createHostEntryModel(
+  address: string,
+  hostnames: readonly string[] | string,
+): HostEntryModel {
+  return {
+    address,
+    hostnames: isString(hostnames) ? [hostnames] : map(hostnames, item => item),
+  };
+}
+
+export function isHostEntryModel(value: unknown): value is HostEntryModel {
+  return (
+    isRegularObject(value) &&
+    hasNoOtherKeysInDevelopment(value, ['address', 'hostnames']) &&
+    isString(objectKey(value, 'address')) &&
+    isStringArray(objectKey(value, 'hostnames'))
+  );
+}
+
+export function explainHostEntryModel(value: unknown): string {
+  return explain([
+    explainRegularObject(value),
+    explainNoOtherKeysInDevelopment(value, ['address', 'hostnames']),
+    explainProperty('address', explainString(objectKey(value, 'address'))),
+    explainProperty(
+      'hostnames',
+      explainStringArray(objectKey(value, 'hostnames')),
+    ),
+  ]);
+}
+
+export function stringifyHostEntryModel(value: HostEntryModel): string {
+  return `HostEntryModel(${value})`;
+}
+
+export function parseHostEntryModel(
+  value: unknown,
+): HostEntryModel | undefined {
+  if (isHostEntryModel(value)) return value;
+  return undefined;
+}

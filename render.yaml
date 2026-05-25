@@ -1,0 +1,25 @@
+# Render Blueprint — add secrets in the Dashboard (not in this file):
+# BACKEND_JWT_SECRET, BACKEND_INITIAL_USERS, BACKEND_EMAIL_CONFIG
+
+services:
+  - type: web
+    name: chat-slayer
+    runtime: node
+    plan: free
+    # NODE_ENV=production omits devDependencies from plain `npm ci`; Vite is required to build.
+    buildCommand: BUILD_NODE_ENV=production npm ci --include=dev && npm run build
+    startCommand: node dist/chat-slayer.cjs
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22.12.0"
+      - key: BACKEND_LOG_LEVEL
+        value: INFO
+      - key: FEDERATION_ENABLED
+        value: "false"
+      # Set in Dashboard (not in git): BACKEND_JWT_SECRET (Secret), BACKEND_PUBLIC_URL,
+      # optional BACKEND_INITIAL_USERS (Secret), BACKEND_EMAIL_CONFIG (Secret).
+      - key: BACKEND_PUBLIC_URL
+        sync: false

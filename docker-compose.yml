@@ -2,20 +2,18 @@ version: '3.1'
 
 services:
 
-  hghs-backend:
-    image: "hghs-backend"
-    container_name: "hghs-backend"
-    hostname: "hghs-backend"
+  chat-slayer-backend:
+    image: "chat-slayer-backend"
+    container_name: "chat-slayer-backend"
+    hostname: "chat-slayer-backend"
     restart: "unless-stopped"
     build: .
     environment:
-      PORT: "8008"
       BACKEND_LOG_LEVEL: "DEBUG"
-      BACKEND_URL: "http://0.0.0.0:8008"
       BACKEND_PUBLIC_URL: "http://localhost:8008"
-      BACKEND_INITIAL_USERS: "$BACKEND_INITIAL_USERS"
-      BACKEND_EMAIL_CONFIG: "smtp://hghs-test-smtp:1025"
-      BACKEND_JWT_SECRET: "$BACKEND_JWT_SECRET"
+      BACKEND_INITIAL_USERS: "${BACKEND_INITIAL_USERS:-}"
+      BACKEND_EMAIL_CONFIG: "smtp://localhost:25"
+      BACKEND_JWT_SECRET: "${BACKEND_JWT_SECRET:?Set BACKEND_JWT_SECRET in your environment or .env}"
+      FEDERATION_ENABLED: "false"
     ports:
-    - "8008:8008"
-    - "8443:8443"
+      - "8008:8008"

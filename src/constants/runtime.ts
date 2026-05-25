@@ -1,36 +1,79 @@
-// Copyright (c) 2022-2023. Heusala Group <info@heusalagroup.fi>. All rights reserved.
-
-import { parseNonEmptyString } from "../fi/hg/core/types/String";
-import { LogLevel, parseLogLevel } from "../fi/hg/core/types/LogLevel";
 import {
-    BUILD_COMMAND_NAME,
-    BUILD_LOG_LEVEL,
-    BUILD_BACKEND_URL,
-    BUILD_BACKEND_HOSTNAME,
-    BUILD_JWT_SECRET,
-    BUILD_JWT_ALG,
-    BUILD_DEFAULT_LANGUAGE,
-    BUILD_EMAIL_CONFIG,
-    BUILD_EMAIL_FROM,
-    BUILD_ACCESS_TOKEN_EXPIRATION_TIME,
-    BUILD_BACKEND_PUBLIC_URL,
-    BUILD_FEDERATION_URL
-} from "./build";
+  loadAllowedClientsConfig,
+  type AllowedClientsConfig,
+} from '../config/allowedClients';
+import {loadDemoSseConfig, type DemoSseConfig} from '../config/demoSse';
+import {resolveBackendJwtSecret} from '../config/secrets';
+import {parseNonEmptyString} from '../fi/cs/core/types/String';
+import {LogLevel, parseLogLevel} from '../fi/cs/core/types/LogLevel';
+import {BUILD_COMMAND_NAME, BUILD_LOG_LEVEL} from './build';
 
-export const BACKEND_LOG_LEVEL       : LogLevel = parseLogLevel(parseNonEmptyString(process?.env?.BACKEND_LOG_LEVEL) ?? parseNonEmptyString(BUILD_LOG_LEVEL)) ?? LogLevel.INFO ;
-export const BACKEND_SCRIPT_NAME     : string   = parseNonEmptyString(process?.env?.BACKEND_SCRIPT_NAME)     ?? BUILD_COMMAND_NAME;
-export const BACKEND_URL             : string   = parseNonEmptyString(process?.env?.BACKEND_URL)             ?? BUILD_BACKEND_URL;
-export const FEDERATION_URL          : string   = parseNonEmptyString(process?.env?.FEDERATION_URL)          ?? BUILD_FEDERATION_URL;
-export const BACKEND_PUBLIC_URL      : string   = parseNonEmptyString(process?.env?.BACKEND_PUBLIC_URL)      ?? BUILD_BACKEND_PUBLIC_URL;
-export const BACKEND_HOSTNAME        : string   = parseNonEmptyString(process?.env?.BACKEND_HOSTNAME)        ?? BUILD_BACKEND_HOSTNAME;
-export const BACKEND_JWT_SECRET      : string   = parseNonEmptyString(process?.env?.BACKEND_JWT_SECRET)      ?? BUILD_JWT_SECRET;
-export const BACKEND_JWT_ALG         : string   = parseNonEmptyString(process?.env?.BACKEND_JWT_ALG)         ?? BUILD_JWT_ALG;
-export const BACKEND_DEFAULT_LANGUAGE : string  = parseNonEmptyString(process?.env?.BACKEND_DEFAULT_LANGUAGE) ?? BUILD_DEFAULT_LANGUAGE;
-export const BACKEND_EMAIL_CONFIG    : string   = parseNonEmptyString(process?.env?.BACKEND_EMAIL_CONFIG)    ?? BUILD_EMAIL_CONFIG;
-export const BACKEND_EMAIL_FROM      : string   = parseNonEmptyString(process?.env?.BACKEND_EMAIL_FROM)      ?? BUILD_EMAIL_FROM;
-export const BACKEND_INITIAL_USERS   : string | undefined  = parseNonEmptyString(process?.env?.BACKEND_INITIAL_USERS);
+const DEFAULT_PORT = '8008';
+const listenPort = parseNonEmptyString(process?.env?.PORT) ?? DEFAULT_PORT;
+
+function defaultBackendUrl(): string {
+  return `http://0.0.0.0:${listenPort}`;
+}
+
+function defaultFederationUrl(): string {
+  const federationPort =
+    parseNonEmptyString(process?.env?.FEDERATION_PORT) ?? '8443';
+  return `http://0.0.0.0:${federationPort}`;
+}
+
+function parseFederationEnabled(): boolean {
+  const raw = parseNonEmptyString(
+    process?.env?.FEDERATION_ENABLED,
+  )?.toLowerCase();
+  if (raw === 'true' || raw === '1') return true;
+  if (raw === 'false' || raw === '0') return false;
+  return false;
+}
+
+export const BACKEND_LOG_LEVEL: LogLevel =
+  parseLogLevel(
+    parseNonEmptyString(process?.env?.BACKEND_LOG_LEVEL) ??
+      parseNonEmptyString(BUILD_LOG_LEVEL),
+  ) ?? LogLevel.INFO;
+export const BACKEND_SCRIPT_NAME: string =
+  parseNonEmptyString(process?.env?.BACKEND_SCRIPT_NAME) ?? BUILD_COMMAND_NAME;
+export const BACKEND_URL: string =
+  parseNonEmptyString(process?.env?.BACKEND_URL) ?? defaultBackendUrl();
+export const FEDERATION_URL: string =
+  parseNonEmptyString(process?.env?.FEDERATION_URL) ?? defaultFederationUrl();
+export const FEDERATION_ENABLED: boolean = parseFederationEnabled();
+export const BACKEND_PUBLIC_URL: string =
+  parseNonEmptyString(process?.env?.BACKEND_PUBLIC_URL) ??
+  'http://localhost:8008';
+export const BACKEND_HOSTNAME: string =
+  parseNonEmptyString(process?.env?.BACKEND_HOSTNAME) ?? 'localhost';
+export const BACKEND_JWT_SECRET: string = resolveBackendJwtSecret();
+export const BACKEND_JWT_ALG: string =
+  parseNonEmptyString(process?.env?.BACKEND_JWT_ALG) ?? 'HS256';
+export const BACKEND_DEFAULT_LANGUAGE: string =
+  parseNonEmptyString(process?.env?.BACKEND_DEFAULT_LANGUAGE) ?? 'en';
+export const BACKEND_EMAIL_CONFIG: string =
+  parseNonEmptyString(process?.env?.BACKEND_EMAIL_CONFIG) ??
+  'smtp://localhost:25';
+export const BACKEND_EMAIL_FROM: string =
+  parseNonEmptyString(process?.env?.BACKEND_EMAIL_FROM) ??
+  'Chat Slayer <noreply@localhost>';
+export const BACKEND_INITIAL_USERS: string | undefined = parseNonEmptyString(
+  process?.env?.BACKEND_INITIAL_USERS,
+);
 
 /**
  * Expiration time in minutes
  */
-export const BACKEND_ACCESS_TOKEN_EXPIRATION_TIME      : string   = parseNonEmptyString(process?.env?.BACKEND_ACCESS_TOKEN_EXPIRATION_TIME)      ?? BUILD_ACCESS_TOKEN_EXPIRATION_TIME;
+export const BACKEND_ACCESS_TOKEN_EXPIRATION_TIME: string =
+  parseNonEmptyString(process?.env?.BACKEND_ACCESS_TOKEN_EXPIRATION_TIME) ??
+  '3600';
+
+const _allowedClientsConfig: AllowedClientsConfig = loadAllowedClientsConfig();
+
+export const ALLOWED_CLIENTS_CONFIG: AllowedClientsConfig =
+  _allowedClientsConfig;
+
+export const CLIENT_ACCESS_ENFORCED: boolean = _allowedClientsConfig.enforced;
+
+export const DEMO_SSE_CONFIG: DemoSseConfig = loadDemoSseConfig();

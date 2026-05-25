@@ -1,0 +1,75 @@
+import {
+  MatrixDiscoveryInformationDTO,
+  isMatrixDiscoveryInformationDTO,
+} from './types/MatrixDiscoveryInformationDTO';
+import {MatrixUserId} from '../../core/MatrixUserId';
+import {isUndefined} from '../../../../core/types/undefined';
+import {isString, isStringOrUndefined} from '../../../../core/types/String';
+import {isRegularObject, objectKey} from '../../../../core/types/RegularObject';
+import {hasNoOtherKeysInDevelopment} from '../../../../core/types/OtherKeys';
+
+export interface MatrixLoginResponseDTO {
+  readonly user_id: MatrixUserId | string;
+  readonly access_token: string;
+
+  /**
+   * Clients should extract the server_name from user_id
+   * @deprecated
+   */
+  readonly home_server?: string;
+
+  readonly device_id: string;
+  readonly well_known?: MatrixDiscoveryInformationDTO;
+}
+
+export function createMatrixLoginResponseDTO(
+  user_id: MatrixUserId | string,
+  access_token: string,
+  home_server: string | undefined,
+  device_id: string,
+  well_known: MatrixDiscoveryInformationDTO | undefined,
+): MatrixLoginResponseDTO {
+  return {
+    user_id,
+    access_token,
+    home_server,
+    device_id,
+    well_known,
+  };
+}
+
+export function isMatrixLoginResponseDTO(
+  value: unknown,
+): value is MatrixLoginResponseDTO {
+  return (
+    isRegularObject(value) &&
+    hasNoOtherKeysInDevelopment(value, [
+      'user_id',
+      'access_token',
+      'home_server',
+      'device_id',
+      'well_known',
+    ]) &&
+    isString(objectKey(value, 'user_id')) &&
+    isString(objectKey(value, 'access_token')) &&
+    isStringOrUndefined(objectKey(value, 'home_server')) &&
+    isStringOrUndefined(objectKey(value, 'device_id')) &&
+    (isUndefined(objectKey(value, 'MatrixWellKnownDTO')) ||
+      isMatrixDiscoveryInformationDTO(value))
+  );
+}
+
+export function stringifyMatrixLoginResponseDTO(
+  value: MatrixLoginResponseDTO,
+): string {
+  if (!isMatrixLoginResponseDTO(value))
+    throw new TypeError(`Not MatrixLoginResponseDTO: ${value}`);
+  return `MatrixLoginResponseDTO(${value})`;
+}
+
+export function parseMatrixLoginResponseDTO(
+  value: unknown,
+): MatrixLoginResponseDTO | undefined {
+  if (isMatrixLoginResponseDTO(value)) return value;
+  return undefined;
+}

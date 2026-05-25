@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat Slayer — Live tutorial</title>
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="256x256"
+      href="/assets/chat-slayer-favicon.png"
+    />
+    <link rel="apple-touch-icon" href="/assets/chat-slayer-favicon.png" />
+    <link rel="stylesheet" href="/demo.css" />
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/gh/starfederation/datastar@1.0.0/bundles/datastar.js"
+    ></script>
+    <script type="module" src="/e2ee.mjs"></script>
+  </head>
+  <body
+    data-signals="{
+      clientId: 'web-demo',
+      accessToken: '',
+      user_id: '',
+      device_id: '',
+      roomId: '',
+      roomName: '',
+      roomNames: '',
+      username: 'alice',
+      password: 'devpass123',
+      message: 'Hello from the tutorial!',
+      status: 'Step 1: register or log in to begin.',
+      streamReady: false,
+      rooms: [],
+      inbox: [],
+      cs: { name: '', payload: null }
+    }"
+    data-computed:tutorialStep="!$accessToken ? 1 : !$streamReady ? 2 : $rooms.length === 0 ? 3 : !$roomId ? 4 : 5"
+    data-computed:tutorialDone="$inbox.length > 0"
+  >
+    <main class="tutorial">
+      <header class="tutorial-hero">
+        <h1>Chat Slayer</h1>
+      </header>
+
+      <ol class="tutorial-progress" aria-label="Tutorial progress">
+        <li data-class:done="$tutorialStep > 1" data-class:current="$tutorialStep === 1">
+          <span class="step-num">1</span> Sign in
+        </li>
+        <li data-class:done="$tutorialStep > 2" data-class:current="$tutorialStep === 2">
+          <span class="step-num">2</span> Live stream
+        </li>
+        <li data-class:done="$tutorialStep > 3" data-class:current="$tutorialStep === 3">
+          <span class="step-num">3</span> Rooms
+        </li>
+        <li data-class:done="$tutorialStep > 4" data-class:current="$tutorialStep === 4">
+          <span class="step-num">4</span> Join
+        </li>
+        <li data-class:done="$tutorialDone" data-class:current="$tutorialStep === 5">
+          <span class="step-num">5</span> Chat
+        </li>
+      </ol>
+
+      <details class="flow-diagram">
+        <summary>How the live stream works (click to explore)</summary>
+        <div class="flow-diagram-body" role="img" aria-label="SSE flow diagram">
+          <div class="flow-node flow-you">Your tab</div>
+          <div class="flow-arrow" aria-hidden="true">POST once</div>
+          <div class="flow-node flow-stream">/demo/stream</div>
+          <div class="flow-arrow" aria-hidden="true">patchSignals</div>
+          <div class="flow-patches">
+            <span class="flow-patch">room-directory</span>
+            <span class="flow-patch">room-message</span>
+            <span class="flow-patch">session</span>
+          </div>
+          <p class="flow-note">
+            Short actions (login, send) return a brief SSE burst; the keepalive
+            stream keeps pushing <code>cs</code> events to every open tab.
+          </p>
+        </div>
+      </details>
+
+      <div class="card">
+        <div
+          id="status"
+          class="status-live"
+          role="status"
+          aria-live="polite"
+          data-text="$status"
+        ></div>
+
+        <div class="card-body">
+          <aside
+            class="tutorial-callout tutorial-callout--step1"
+            data-show="$tutorialStep === 1"
+            aria-live="polite"
+          >
+            <h2>Step 1 — Create a session</h2>
+            <p>
+              Use <strong>Register</strong> for a new user or <strong>Login</strong>
+              if you seeded <code>BACKEND_INITIAL_USERS</code>. Nothing else runs
+              until you have an <code>accessToken</code>.
+            </p>
+          </aside>
+
+          <section
+            class="tutorial-panel tutorial-panel--auth"
+            data-show="!$accessToken"
+            data-class:highlight="$tutorialStep === 1"
+            aria-labelledby="credentials-heading"
+          >
+            <h2 id="credentials-heading">Account</h2>
+            <fieldset>
+              <legend class="visually-hidden">Credentials</legend>
+              <label>
+                User
+                <input
+                  class="field"
+                  data-bind:username
+                  autocomplete="username"
+                  minlength="3"
+                  pattern="[a-zA-Z0-9._=-]{3,255}"
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  class="field"
+                  data-bind:password
+                  type="password"
+                  minlength="8"
+                  autocomplete="current-password"
+                />
+              </label>
+            </fieldset>
+            <div class="actions" role="group" aria-label="Authentication">
+              <button
+                type="button"
+                class="primary"
+                data-indicator:authPending
+                data-on:click="@post('/demo/actions/register', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo' } })"
+              >
+                Register
+              </button>
+              <button
+                type="button"
+                class="secondary"
+                data-indicator:authPending
+                data-on:click="@post('/demo/actions/login', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo' } })"
+              >
+                Login
+              </button>
+            </div>
+            <p data-show="$authPending" class="hint">Working…</p>
+          </section>
+
+          <aside
+            class="tutorial-callout"
+            data-show="$tutorialStep === 2"
+            aria-live="polite"
+          >
+            <h2>Step 2 — Live stream</h2>
+            <p>
+              Connecting in the background. The room list fills in when the
+              stream is ready.
+            </p>
+          </aside>
+
+          <div
+            id="sse-bootstrap"
+            class="visually-hidden"
+            data-show="$accessToken.length > 0 && !$streamReady"
+            data-effect="if ($accessToken.length > 0 && !$streamReady) { @get('/demo/stream', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo', Authorization: 'Bearer ' + $accessToken }, filterSignals: { exclude: /.*/ }, openWhenHidden: true, requestCancellation: 'disabled' }) }"
+          ></div>
+
+          <div
+            id="e2ee-bridge"
+            class="visually-hidden"
+            data-effect="window.ChatSlayerE2ee?.onSignals({ accessToken: $accessToken, user_id: $user_id, device_id: $device_id, roomId: $roomId, inbox: $inbox })"
+          ></div>
+
+          <div
+            id="demo-live"
+            class="tutorial-panel tutorial-panel--live"
+            data-show="$accessToken"
+          >
+            <p data-show="$user_id" class="session-badge">
+              Signed in as <span data-text="$user_id"></span>
+              <span data-show="$streamReady" class="stream-pill">SSE live</span>
+            </p>
+
+            <section
+              class="tutorial-stage"
+              data-class:highlight="$tutorialStep === 3"
+              aria-labelledby="rooms-heading"
+            >
+              <h2 id="rooms-heading">Step 3 — Rooms on the stream</h2>
+              <p class="hint">
+                Create one room or register a group (existing names are reused).
+              </p>
+
+              <div class="room-actions">
+                <fieldset>
+                  <legend>Create one</legend>
+                  <label>
+                    Room name
+                    <input
+                      id="room-name"
+                      class="field"
+                      data-bind:roomName
+                      placeholder="e.g. Sigma"
+                      minlength="3"
+                      autocomplete="off"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    class="secondary"
+                    data-indicator:_creatingRoom
+                    data-on:click="@post('/demo/actions/create-room', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo', 'X-Demo-Room-Name': el.parentElement.querySelector('#room-name').value.trim() } })"
+                  >
+                    Create room
+                  </button>
+                  <p data-show="$_creatingRoom" class="hint">Creating…</p>
+                </fieldset>
+                <fieldset>
+                  <legend>Register a group</legend>
+                  <p class="hint">
+                    Separate from <strong>Create one</strong> — only the names
+                    you type here are registered when you click below.
+                  </p>
+                  <label>
+                    Names (comma-separated)
+                    <input
+                      id="room-names"
+                      class="field"
+                      data-bind:roomNames
+                      placeholder="Lobby, Team Chat, Archive"
+                      autocomplete="off"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    class="secondary"
+                    data-on:click="@post('/demo/actions/register-rooms', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo', 'X-Demo-Room-Names': el.parentElement.querySelector('#room-names').value.trim() } })"
+                  >
+                    Register rooms
+                  </button>
+                </fieldset>
+              </div>
+
+              <ul id="room-list" class="room-list">
+                <li data-show="!$streamReady" class="empty state-connecting">
+                  Connecting to live stream…
+                </li>
+              </ul>
+            </section>
+
+            <aside
+              class="tutorial-callout"
+              data-show="$tutorialStep === 4"
+              aria-live="polite"
+            >
+              <h2>Step 4 — Join a room</h2>
+              <p>
+                Pick a room from the list or the <strong>Active room</strong>
+                dropdown. Catch-up messages arrive on the <em>same</em> stream.
+              </p>
+            </aside>
+
+            <section
+              class="tutorial-stage"
+              data-class:highlight="$tutorialStep === 4 || $tutorialStep === 5"
+              aria-labelledby="chat-heading"
+            >
+              <h2 id="chat-heading">Step 4–5 — Messages</h2>
+              <label>
+                Active room
+                <select
+                  id="room-picker"
+                  class="field room-picker"
+                  data-on:change="if (el.value) { @post('/demo/actions/join-room', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo', 'X-Demo-Room-Id': el.value } }) }"
+                >
+                  <option value="">Pick a room…</option>
+                </select>
+              </label>
+              <fieldset>
+                <legend>Send a message</legend>
+                <label>
+                  Message
+                  <input
+                    id="send-message"
+                    class="field"
+                    data-bind:message
+                    autocomplete="off"
+                  />
+                </label>
+                <button
+                  type="button"
+                  class="primary"
+                  data-on:click="window.ChatSlayerE2ee?.queueSend()"
+                  data-on:csSendReady__window="@post('/demo/actions/send', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo', 'X-Demo-Room-Id': evt.detail.roomId, 'X-Demo-Encrypted-Event': evt.detail.encrypted, 'X-Demo-Message': evt.detail.plaintext } })"
+                >
+                  Send
+                </button>
+              </fieldset>
+
+              <div id="inbox" class="inbox">
+                <p class="empty">
+                  No messages yet — join a room and send one.
+                </p>
+              </div>
+            </section>
+
+            <aside
+              class="tutorial-callout tutorial-callout--finish"
+              data-show="$tutorialDone"
+              aria-live="polite"
+            >
+              <h2>You did it</h2>
+              <p>
+                Open a <strong>second browser tab</strong>, log in as another user,
+                join the same room, and watch messages appear without refresh —
+                that is the hub broadcasting on your existing SSE connection.
+              </p>
+            </aside>
+          </div>
+
+          <p data-show="$cs.name === 'error'" class="error-banner" role="alert">
+            <span data-text="$cs.payload.message"></span>
+          </p>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
