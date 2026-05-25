@@ -61,7 +61,11 @@ Default demo password in the form is `devpass123` (match `BACKEND_INITIAL_USERS`
 npm run build:demo
 ```
 
-Copies to `dist/demo/`: `index.html`, `demo.css`, `e2ee.mjs`, `assets/chat-slayer-logo.png`, `assets/chat-slayer-favicon.png`, and `crypto-sdk/` (from `@matrix-org/matrix-sdk-crypto-wasm`).
+Copies to `dist/demo/`: `index.html`, `demo.css`, `e2ee.mjs`, `assets/chat-slayer-logo.png`, `assets/chat-slayer-favicon.png`, `assets/chat-slayer-og.png` (1200×630 social preview), and `crypto-sdk/` (from `@matrix-org/matrix-sdk-crypto-wasm`).
+
+### Social link previews (Open Graph)
+
+`index.html` includes OG/Twitter meta; the server injects absolute `og:url` and `og:image` from `BACKEND_PUBLIC_URL` at runtime. After deploy, verify with [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) or the X Card Validator using `https://<your-service>.onrender.com/`.
 
 ```bash
 npm run build   # server bundle + build:demo

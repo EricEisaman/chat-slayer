@@ -158,6 +158,7 @@ curl -s http://127.0.0.1:10000/
 
 | Symptom | Likely cause | Fix |
 |---------|----------------|-----|
+| Build log shows **Dockerfile** / `npm ci` exit 1 | Service uses **Docker** runtime, not [render.yaml](render.yaml) native Node | In Dashboard → **Settings** → set **Runtime** to **Node** (or sync Blueprint with `runtime: node`). Or redeploy after updating [Dockerfile](Dockerfile) (multi-stage; copies `demo/` + `resources/`). |
 | Build fails: `vite: not found` | Dev deps skipped | Use `npm ci --include=dev` in build (already in blueprint). |
 | Immediate exit on start | Missing/weak `BACKEND_JWT_SECRET` or bad `BACKEND_PUBLIC_URL` | Set Secret JWT (32+ chars) and HTTPS public URL in Dashboard. |
 | Health check failed | App not binding to `PORT` | Remove custom `PORT` / `BACKEND_URL` overrides; redeploy. |
@@ -197,4 +198,4 @@ Full details: [CLIENT_GUIDE.md](CLIENT_GUIDE.md).
 - [.env.example](.env.example) — Local dev template (not used on Render)
 - [CLIENT_GUIDE.md](CLIENT_GUIDE.md) — Allowed clients and web demo
 - [README.md](README.md) — General project overview
-- [Dockerfile](Dockerfile) — Alternative deploy (same env var names)
+- [Dockerfile](Dockerfile) — Optional Docker deploy (docker-compose; multi-stage). Blueprint uses **native Node**, not Docker, unless you change runtime in the Dashboard.

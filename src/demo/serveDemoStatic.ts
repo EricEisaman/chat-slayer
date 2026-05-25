@@ -7,6 +7,7 @@ import {
   findAllowedClientById,
   getAllowedClientsConfig,
 } from '../config/allowedClients';
+import {injectDemoPageMeta} from './demoPageMeta';
 import {BACKEND_PUBLIC_URL} from '../constants/runtime';
 
 const DEMO_CLIENT_ID = 'web-demo';
@@ -190,6 +191,14 @@ export function tryServeDemoStatic(
   if (method === 'HEAD') {
     res.statusCode = 200;
     res.end();
+    return true;
+  }
+
+  const relative = mapUrlToRelativeFile(path);
+  if (relative === 'index.html') {
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.end(injectDemoPageMeta(readFileSync(file, 'utf8')));
     return true;
   }
 

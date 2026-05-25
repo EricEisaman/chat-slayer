@@ -7,6 +7,7 @@ import {CHAT_SLAYER_CLIENT_ID_HEADER} from '../config/allowedClients';
 import {MatrixServerService} from '../fi/cs/matrix/server/MatrixServerService';
 import {MatrixVisibility} from '../fi/cs/matrix/types/request/createRoom/types/MatrixVisibility';
 import {createMatrixTextMessageDTO} from '../fi/cs/matrix/types/message/textMessage/MatrixTextMessageDTO';
+import {injectDemoPageMeta} from './demoPageMeta';
 import {getDemoStaticRoot} from './serveDemoStatic';
 import {getDemoEventHub, type DemoSseSubscriber} from './DemoEventHub';
 import {messageLineFromTimelineEvent} from './demoMessageLine';
@@ -88,7 +89,7 @@ function readPageHtml(): string | undefined {
   if (!existsSync(path)) {
     return undefined;
   }
-  return readFileSync(path, 'utf8');
+  return injectDemoPageMeta(readFileSync(path, 'utf8'));
 }
 
 async function handleRegister(
