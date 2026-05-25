@@ -31,7 +31,9 @@ Set these in **Environment** for the web service. Use **Secret** for sensitive v
 | `BACKEND_JWT_SECRET` | **Yes** | **Yes** | Random string, **at least 32 characters**. Signs Matrix access tokens. Validated only when **`NODE_ENV=production`** (set by Render). Local `npm run start-prod` does not require this. |
 | `BACKEND_PUBLIC_URL` | No | **Yes** | Public HTTPS URL, e.g. `https://chat-slayer.onrender.com` (no trailing slash). Used for Matrix client discovery (`/_matrix/client/...`). Must be `https://` in production; localhost is rejected. |
 | `BACKEND_HOSTNAME` | No | Recommended | Matrix server name host only, e.g. `chat-slayer.onrender.com` (same host as `BACKEND_PUBLIC_URL`, without `https://`). Defaults to `localhost` if unset (wrong for real clients). |
-| `BACKEND_INITIAL_USERS` | **Yes** | Optional | Seed users: `user:password` or `user:password;user2:pass2`. Passwords are secrets; only needed if you want users recreated after each deploy (ephemeral memory). |
+| `BACKEND_INITIAL_USERS` | **Yes** | Optional | Seed users: `user:password` or `user:password;user2:pass2`. Passwords are secrets; only needed if you want users recreated after each deploy (ephemeral memory). Required if you use `BACKEND_INITIAL_ROOMS` (public boot-seed). |
+| `BACKEND_INITIAL_ROOMS` | No | Optional | Comma-separated **public** room display names. Boot-seeded at startup for the first seed user; visible to all users. |
+| `BACKEND_PRIVATE_ROOMS` | No | Optional | Comma-separated **private** room display names. Hidden until each user discovers the exact name. Never logged by name (count only). |
 | `BACKEND_EMAIL_CONFIG` | **Yes** (often) | Optional | SMTP URL, e.g. `smtps://user:pass@smtp.example.com:465`. May embed credentials — always use a Secret. Default `smtp://localhost:25` is not useful on Render unless you add SMTP elsewhere. |
 | `BACKEND_EMAIL_FROM` | No | Optional | From header, e.g. `Chat Slayer <noreply@yourdomain.com>`. |
 | `BACKEND_JWT_ALG` | No | Optional | Default `HS256`. |
@@ -204,7 +206,17 @@ Production enforces the client gate by default. The **built-in demo UI** is serv
 
 Replace `your-service` with your Render hostname. The server also adds `BACKEND_PUBLIC_URL` to `web-demo` origins when that client is listed.
 
-On each deploy/start, the service logs **client access enforcement** and every allowed **client id** with its **origins** list (and whether `allowWithoutOrigin` is set). Check Render **Logs** right after boot to confirm your Dashboard env matches what the process loaded.
+On each deploy/start, the service logs **client access enforcement** and every allowed **client id** with its **origins** list (and whether `allowWithoutOrigin` is set). When preconfigured rooms are configured, logs also show **counts** only, for example `Preconfigured public rooms: N (boot-seeded)` and `Preconfigured private room names: M (hidden until discovered)` — never secret room names. Check Render **Logs** right after boot to confirm your Dashboard env matches what the process loaded.
+
+### v0.0.1 migration (room env vars)
+
+If you previously set `BACKEND_INITIAL_ROOMS` for **secret** rooms:
+
+1. Copy those names into **`BACKEND_PRIVATE_ROOMS`** in the Dashboard.
+2. Use **`BACKEND_INITIAL_ROOMS`** only for public lobby-style rooms (with **`BACKEND_INITIAL_USERS`**).
+3. Save and redeploy.
+
+See [CLIENT_GUIDE.md](CLIENT_GUIDE.md#migration-v001-room-env-vars).
 
 - External browser UIs need their exact HTTPS origin in `origins`.
 - Scripts use `X-Chat-Slayer-Client-Id: ops-cli` without an `Origin` header when `allowWithoutOrigin` is `true`.

@@ -184,11 +184,30 @@ Common errcodes: `M_USER_IN_USE` (409), `M_INVALID_USERNAME` (400). Sending `aut
 
 Optional seed users (local demo only): `BACKEND_INITIAL_USERS=alice:devpass123` in `.env` — matches the demo form default password. Not required for open registration.
 
+### Preconfigured public rooms
+
+Set `BACKEND_INITIAL_ROOMS=Lobby,Town Square` (comma-separated display names). At startup, the server creates each room as **public** and joins the **first** user from `BACKEND_INITIAL_USERS`. Every authenticated user sees these rooms in the demo room list and SSE directory without a discover step.
+
+Requires at least one `user:password` pair in `BACKEND_INITIAL_USERS`. Startup logs report a **count** of public rooms (not names).
+
 ### Preconfigured private rooms (server-enforced)
 
-Set `BACKEND_INITIAL_ROOMS=NameOne,NameTwo` (comma-separated display names). The server **never** exposes those names in `/demo-config.json`, unscoped room listings, or another user’s SSE directory. A user only sees a room after submitting the **exact** name via `discover-private-room`, create/register with that name, or Matrix `POST /_matrix/client/r0/rooms/register` including that name.
+Set `BACKEND_PRIVATE_ROOMS=NameOne,NameTwo` (comma-separated display names). The server **never** exposes those names in `/demo-config.json`, unscoped room listings, or another user’s SSE directory. A user only sees a room after submitting the **exact** name via `discover-private-room`, create/register with that name, or Matrix `POST /_matrix/client/r0/rooms/register` including that name.
 
-Even with a `room_id`, `join` and `send` return **404 Room not found** until that user has discovered the name. `/demo-config.json` only includes `privateRoomsEnabled: true` when the env var is set (no name list).
+Even with a `room_id`, `join` and `send` return **404 Room not found** until that user has discovered the name. `/demo-config.json` only includes `privateRoomsEnabled: true` when `BACKEND_PRIVATE_ROOMS` is set (no name list). Startup logs report a **count** of private room names (not names).
+
+Do not list the same display name in both `BACKEND_INITIAL_ROOMS` and `BACKEND_PRIVATE_ROOMS` (startup fails with a conflict error).
+
+### Migration (v0.0.1 room env vars)
+
+**Before v0.0.1:** `BACKEND_INITIAL_ROOMS=NameOne,Lobby` configured **hidden private** rooms.
+
+**After v0.0.1:**
+
+- `BACKEND_INITIAL_ROOMS=Lobby,Town Square` → **public**, visible to everyone after boot (needs `BACKEND_INITIAL_USERS`).
+- `BACKEND_PRIVATE_ROOMS=NameOne,Lobby` → **private**, hidden until users enter the exact name.
+
+On Render, move secret room names from `BACKEND_INITIAL_ROOMS` to `BACKEND_PRIVATE_ROOMS`, then redeploy.
 
 ### curl (step 1 + 2)
 

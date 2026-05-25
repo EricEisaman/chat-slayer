@@ -1,5 +1,6 @@
 # Render Blueprint — add secrets in the Dashboard (not in this file):
 # BACKEND_JWT_SECRET, BACKEND_INITIAL_USERS, BACKEND_EMAIL_CONFIG
+# Optional: BACKEND_INITIAL_ROOMS (public boot-seed), BACKEND_PRIVATE_ROOMS (hidden private)
 
 services:
   - type: web
@@ -20,6 +21,7 @@ services:
       - key: FEDERATION_ENABLED
         value: "false"
       # Set in Dashboard (not in git): BACKEND_JWT_SECRET (Secret), BACKEND_PUBLIC_URL,
-      # optional BACKEND_INITIAL_USERS (Secret), BACKEND_EMAIL_CONFIG (Secret).
+      # optional BACKEND_INITIAL_USERS (Secret), BACKEND_INITIAL_ROOMS, BACKEND_PRIVATE_ROOMS,
+      # BACKEND_EMAIL_CONFIG (Secret).
       - key: BACKEND_PUBLIC_URL
         sync: false

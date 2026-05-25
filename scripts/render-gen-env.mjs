@@ -398,6 +398,16 @@ function printDashboardGuide(host, bundle, useColor) {
     '  BACKEND_EMAIL_CONFIG — only if you use SMTP; add as Secret (Section C style).',
     useColor,
   );
+  println(
+    'dim',
+    '  BACKEND_INITIAL_ROOMS — optional public rooms (comma-separated); needs BACKEND_INITIAL_USERS.',
+    useColor,
+  );
+  println(
+    'dim',
+    '  BACKEND_PRIVATE_ROOMS — optional private rooms (comma-separated); hidden until discovered.',
+    useColor,
+  );
   console.log('');
 
   println(

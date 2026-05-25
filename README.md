@@ -12,6 +12,7 @@
 | [demo/README.md](demo/README.md) | Browser demo at `/` (Datastar SSE, actions, optional E2EE) |
 | [CLIENT_GUIDE.md](CLIENT_GUIDE.md) | `ALLOWED_CLIENTS`, `X-Chat-Slayer-Client-Id`, curl examples |
 | [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) | Production deploy on Render |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes |
 | [STYLEGUIDE.md](STYLEGUIDE.md) | Lint, format, TypeScript conventions |
 
 Shared code lives under `src/fi/cs/` (core, matrix, backend, node). Vite builds the server entry [`src/chat-slayer.ts`](src/chat-slayer.ts) to `dist/chat-slayer.cjs`. Node **20.19+** is required at runtime.
@@ -24,6 +25,8 @@ Copy [`.env.example`](.env.example) to `.env` for local development. **Never com
 |----------|---------|-------|
 | `BACKEND_JWT_SECRET` | Yes on Render | Optional locally — a dev default is used if unset; set a 32+ char secret when `NODE_ENV=production` |
 | `BACKEND_INITIAL_USERS` | Yes | Optional `user:password` pairs, `;`-separated (demo UI defaults to `devpass123`) |
+| `BACKEND_INITIAL_ROOMS` | No | Optional public room names (comma-separated); boot-seeded at startup — requires seed users |
+| `BACKEND_PRIVATE_ROOMS` | No | Optional private room names (hidden until discovered); see [CLIENT_GUIDE.md](CLIENT_GUIDE.md) |
 | `BACKEND_EMAIL_CONFIG` | Often | SMTP URL may include credentials |
 | `BACKEND_PUBLIC_URL` | No | Public URL clients use for discovery |
 | `PORT` | No | Set by Render automatically — do not override in Dashboard |

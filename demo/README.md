@@ -13,6 +13,8 @@ Room list and inbox updates use SSE (`cs` patches). They do not use Matrix `/syn
 
 `window.__CS_DEMO_CONFIG__` is injected in the HTML at serve time (same fields as `/demo-config.json`). **E2EE is enabled by default** (`e2eeEnabled: true`); set `DEMO_E2EE_ENABLED=false` to force plaintext sends.
 
+`privateRoomsEnabled` is `true` only when the server has `BACKEND_PRIVATE_ROOMS` set (no room names are exposed). Boot-seeded **public** rooms from `BACKEND_INITIAL_ROOMS` appear in the room list and in the **Active room** dropdown under **Public rooms** (green = private, blue = public in the closed picker and list).
+
 ## Run
 
 1. From repo root: copy [`.env.example`](../.env.example) to `.env` (optional `BACKEND_INITIAL_USERS=alice:devpass123`).
