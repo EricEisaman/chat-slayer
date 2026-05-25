@@ -70,7 +70,27 @@ Set these in **Environment** for the web service. Use **Secret** for sensitive v
 5. **Placeholder blocklist** — Values like `change-me-in-render-dashboard` from [.env.example](.env.example) are rejected in production (example file is for local dev only).
 6. **Repo scanning** — [.github/workflows/gitleaks.yml](.github/workflows/gitleaks.yml) runs on push/PR to catch accidental secret commits.
 
-### Generate a JWT secret (example)
+### Generate Dashboard env vars (recommended)
+
+From the repo root, run the local generator. It prints **colored sections A–F** that map to the Render UI (which vars to skip, which need **Secret** on, and what to copy into each field):
+
+```bash
+npm run render:gen:env
+npm run render:gen:env -- --write   # also writes plain .env.render for "Add from .env"
+```
+
+| Section | Render Dashboard |
+|---------|------------------|
+| **A** | Skip — already in [render.yaml](render.yaml) |
+| **B** | Environment → **+ Add Environment Variable**, Secret **OFF** |
+| **C** | Same, Secret **ON** (`BACKEND_JWT_SECRET`, optional seed) |
+| **D** | **Add from .env** — paste `--- BEGIN .env ---` block |
+| **E** | Do not set (`PORT`, etc.) |
+| **F** | Manual (`BACKEND_EMAIL_CONFIG` if needed) |
+
+Options: `--service <slug>`, `--url https://…`, `--seed user:pass`, `--no-color`. Values to paste are printed on **plain lines** (no ANSI) for easy copy.
+
+### Generate a JWT secret (manual alternative)
 
 ```bash
 openssl rand -base64 48

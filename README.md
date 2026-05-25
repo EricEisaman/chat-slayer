@@ -57,6 +57,7 @@ For a two-browser smoke test, see [demo/README.md](demo/README.md).
 | `start-prod` | `build:demo` + `node dist/chat-slayer.cjs` |
 | `start-prod:deploy` | Production-mode env checks + `node dist/chat-slayer.cjs` (run after `npm run build`) |
 | `pkill` | Stop processes on port 8008 and stray vite-node/chat-slayer runs |
+| `render:gen:env` | Generate Render Dashboard env vars (colored copy-paste guide; see [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)) |
 | `test` | Vitest-node unit tests |
 | `lint` / `fix` / `typecheck` | See [STYLEGUIDE.md](STYLEGUIDE.md) |
 
