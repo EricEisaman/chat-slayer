@@ -62,11 +62,7 @@ function getRequestPath(req: IncomingMessage): string {
 }
 
 export function isDemoApiPath(path: string): boolean {
-  return (
-    path === '/demo/stream' ||
-    path.startsWith('/demo/actions/') ||
-    path === '/demo-config.json'
-  );
+  return path === '/demo/stream' || path.startsWith('/demo/actions/');
 }
 
 function getHeader(req: IncomingMessage, name: string): string | undefined {

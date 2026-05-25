@@ -67,6 +67,20 @@ export const BACKEND_INITIAL_ROOMS: string | undefined = parseNonEmptyString(
   process?.env?.BACKEND_INITIAL_ROOMS,
 );
 
+function parseDemoE2eeEnabled(): boolean {
+  const raw = parseNonEmptyString(process?.env?.DEMO_E2EE_ENABLED)?.toLowerCase();
+  if (raw === 'false' || raw === '0') {
+    return false;
+  }
+  if (raw === 'true' || raw === '1') {
+    return true;
+  }
+  return true;
+}
+
+/** Demo browser encryption on send (default true; set DEMO_E2EE_ENABLED=false to disable). */
+export const DEMO_E2EE_ENABLED: boolean = parseDemoE2eeEnabled();
+
 /**
  * Expiration time in minutes
  */

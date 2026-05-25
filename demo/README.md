@@ -11,6 +11,8 @@ Browser UI at `/` on the same process and port as the API (default `http://local
 
 Room list and inbox updates use SSE (`cs` patches). They do not use Matrix `/sync` polling. E2EE may call `/sync` only for device-key exchange.
 
+`window.__CS_DEMO_CONFIG__` is injected in the HTML at serve time (same fields as `/demo-config.json`). **E2EE is enabled by default** (`e2eeEnabled: true`); set `DEMO_E2EE_ENABLED=false` to force plaintext sends.
+
 ## Run
 
 1. From repo root: copy [`.env.example`](../.env.example) to `.env` (optional `BACKEND_INITIAL_USERS=alice:devpass123`).
@@ -29,7 +31,7 @@ All demo actions send `X-Chat-Slayer-Client-Id: web-demo` when client access is 
 | `/` | GET | Demo HTML |
 | `/demo.css`, `/assets/*`, `/favicon.ico` | GET | Static assets |
 | `/e2ee.mjs`, `/crypto-sdk/*` | GET | E2EE module + WASM |
-| `/demo-config.json` | GET | Client id and API base for the page |
+| `/demo-config.json` | GET | Public demo flags (`e2eeEnabled`, `privateRoomsEnabled`, client id, API base) — no client header |
 | `/demo/stream` | GET | Long-lived SSE (`Authorization: Bearer`) |
 | `/demo/actions/register` | POST | Register |
 | `/demo/actions/login` | POST | Login |

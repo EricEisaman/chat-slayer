@@ -19,9 +19,11 @@ import {
   BACKEND_INITIAL_USERS,
   BACKEND_INITIAL_ROOMS,
   BACKEND_PUBLIC_URL,
+  ALLOWED_CLIENTS_CONFIG,
   FEDERATION_URL,
   FEDERATION_ENABLED,
 } from './constants/runtime';
+import {formatAllowedClientsLogLines} from './config/allowedClients';
 import {validateProductionEnv} from './config/validateEnv';
 import {BUILD_USAGE_URL, BUILD_WITH_FULL_USAGE} from './constants/build';
 
@@ -61,6 +63,13 @@ const LOG = LogService.createLogger('main');
 export async function main(args: string[] = []): Promise<CommandExitStatus> {
   try {
     validateProductionEnv();
+
+    for (const line of formatAllowedClientsLogLines(
+      ALLOWED_CLIENTS_CONFIG,
+      BACKEND_PUBLIC_URL,
+    )) {
+      LOG.info(line);
+    }
 
     RequestRouterImpl.setLogLevel(LogLevel.INFO);
     RequestClientImpl.setLogLevel(LogLevel.INFO);

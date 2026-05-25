@@ -48,6 +48,14 @@ function testDemoStaticExempt(): void {
   assert.equal(d.allowed, true);
 }
 
+function testDemoConfigJsonPublic(): void {
+  const d = evaluateClientAccess(
+    mockReq({method: 'GET', url: '/demo-config.json'}),
+    sampleConfig,
+  );
+  assert.equal(d.allowed, true);
+}
+
 function testEnforcementOff(): void {
   const d = evaluateClientAccess(mockReq({url: '/_matrix/client/r0/login'}), {
     enforced: false,
@@ -108,6 +116,7 @@ function testMissingClientId(): void {
 resetAllowedClientsConfigCache();
 testHealthExempt();
 testDemoStaticExempt();
+testDemoConfigJsonPublic();
 testEnforcementOff();
 testBrowserClient();
 testDenyWrongOrigin();

@@ -1,4 +1,5 @@
 import {BACKEND_PUBLIC_URL} from '../constants/runtime';
+import {buildDemoConfigInlineScript} from './demoClientConfig';
 
 export const DEMO_OG_TITLE =
   'Chat Slayer — Matrix-compatible chat in one Node process';
@@ -16,6 +17,7 @@ const PLACEHOLDERS = {
   ogImage: '__CS_OG_IMAGE__',
   ogTitle: '__CS_OG_TITLE__',
   ogDescription: '__CS_OG_DESCRIPTION__',
+  demoConfigScript: '__CS_DEMO_CONFIG_SCRIPT__',
 } as const;
 
 export function getDemoPublicBaseUrl(): string {
@@ -58,6 +60,14 @@ export function injectDemoPageMeta(html: string, baseUrl?: string): string {
     if (out.includes(placeholder)) {
       out = out.split(placeholder).join(escapeHtmlAttr(value));
     }
+  }
+  if (out.includes(PLACEHOLDERS.demoConfigScript)) {
+    out = out.split(PLACEHOLDERS.demoConfigScript).join(buildDemoConfigInlineScript());
+  } else if (!out.includes('window.__CS_DEMO_CONFIG__')) {
+    out = out.replace(
+      '</head>',
+      `    ${buildDemoConfigInlineScript()}\n  </head>`,
+    );
   }
   return out;
 }

@@ -2,19 +2,10 @@ import {existsSync, readFileSync, statSync} from 'node:fs';
 import {join, dirname, normalize} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import type {IncomingMessage, ServerResponse} from 'http';
-import {
-  type AllowedClientConfig,
-  findAllowedClientById,
-  getAllowedClientsConfig,
-} from '../config/allowedClients';
 import {injectDemoPageMeta} from './demoPageMeta';
-import {BACKEND_INITIAL_ROOMS, BACKEND_PUBLIC_URL} from '../constants/runtime';
-import {
-  isPreconfiguredPrivateRoomsEnabled,
-  parseInitialRoomNames,
-} from '../config/initialRooms';
+import {buildDemoConfigJson} from './demoClientConfig';
 
-const DEMO_CLIENT_ID = 'web-demo';
+export {buildDemoConfigJson, buildDemoClientConfig} from './demoClientConfig';
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -77,30 +68,6 @@ export function isDemoStaticPath(path: string): boolean {
     path === '/e2ee.mjs' ||
     path === '/private-rooms.mjs' ||
     path.startsWith('/crypto-sdk/')
-  );
-}
-
-export function buildDemoConfigJson(): string {
-  const config = getAllowedClientsConfig();
-  const demoClient =
-    findAllowedClientById(config.clients, DEMO_CLIENT_ID) ?? config.clients[0];
-  const publicOrigin = BACKEND_PUBLIC_URL.replace(/\/$/, '');
-  const preconfiguredNames = parseInitialRoomNames(BACKEND_INITIAL_ROOMS);
-  return JSON.stringify(
-    {
-      enforced: config.enforced,
-      defaultClientId: demoClient?.id ?? DEMO_CLIENT_ID,
-      apiBase: publicOrigin || '',
-      privateRoomsEnabled: isPreconfiguredPrivateRoomsEnabled(
-        preconfiguredNames,
-      ),
-      clients: config.clients.map((c: AllowedClientConfig) => ({
-        id: c.id,
-        label: c.label,
-      })),
-    },
-    null,
-    2,
   );
 }
 

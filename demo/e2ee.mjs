@@ -17,6 +17,10 @@ import {
 
 const CLIENT_HEADER = 'X-Chat-Slayer-Client-Id';
 const CLIENT_ID = 'web-demo';
+
+function isE2eeEnabled() {
+  return window.__CS_DEMO_CONFIG__?.e2eeEnabled !== false;
+}
 /** @type {import('./crypto-sdk/pkg/matrix_sdk_crypto_wasm.d.ts').OlmMachine | undefined} */
 let machine;
 let session = {
@@ -322,7 +326,7 @@ const ChatSlayerE2ee = {
     let encrypted = '';
     let plaintext = text;
 
-    if (machine && session.accessToken) {
+    if (isE2eeEnabled() && machine && session.accessToken) {
       try {
         await withTimeout(prepareRoom(roomId), 12000, 'prepareRoom');
         const payload = JSON.stringify({msgtype: 'm.text', body: text});

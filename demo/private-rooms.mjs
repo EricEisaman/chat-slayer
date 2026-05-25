@@ -1,4 +1,6 @@
 const STORAGE_KEY = 'chat-slayer-private-room-names-remembered';
+const CLIENT_HEADER = 'X-Chat-Slayer-Client-Id';
+const CLIENT_ID = 'web-demo';
 
 function readRemembered() {
   try {
@@ -32,6 +34,9 @@ function rememberName(name) {
 }
 
 function renderRememberedChips(container) {
+  if (!container) {
+    return;
+  }
   container.replaceChildren();
   for (const name of readRemembered()) {
     const chip = document.createElement('button');
@@ -56,19 +61,41 @@ function flashDialogSuccess(dialog) {
   }, 600);
 }
 
+function readInlineDemoConfig() {
+  const inline = window.__CS_DEMO_CONFIG__;
+  if (inline && typeof inline === 'object') {
+    return inline;
+  }
+  return null;
+}
+
 async function loadPrivateRoomsConfig() {
+  const inline = readInlineDemoConfig();
+  if (inline) {
+    return inline;
+  }
   try {
-    const res = await fetch('/demo-config.json', {cache: 'no-store'});
+    const res = await fetch('/demo-config.json', {
+      cache: 'no-store',
+      headers: {[CLIENT_HEADER]: CLIENT_ID},
+    });
     if (!res.ok) {
-      return {privateRoomsEnabled: false};
+      return {privateRoomsEnabled: false, e2eeEnabled: true};
     }
     return await res.json();
   } catch {
-    return {privateRoomsEnabled: false};
+    return {privateRoomsEnabled: false, e2eeEnabled: true};
   }
 }
 
+let discoverProxyWired = false;
+
 function wireDiscoverProxy() {
+  if (discoverProxyWired) {
+    return;
+  }
+  discoverProxyWired = true;
+
   const proxy = document.getElementById('discover-room-proxy');
   const input = document.getElementById('room-by-name-input');
   const dialog = document.getElementById('room-by-name-dialog');
@@ -88,7 +115,11 @@ function wireDiscoverProxy() {
     if (!input.value && readRemembered().length > 0) {
       input.value = readRemembered()[readRemembered().length - 1];
     }
-    dialog.showModal();
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute('open', '');
+    }
     input.focus();
   };
 
@@ -160,8 +191,16 @@ function wireDiscoverProxy() {
   }
 }
 
-loadPrivateRoomsConfig().then((config) => {
-  if (config.privateRoomsEnabled) {
+function initPrivateRooms() {
+  const inline = readInlineDemoConfig();
+  if (inline?.privateRoomsEnabled) {
     wireDiscoverProxy();
   }
-});
+  loadPrivateRoomsConfig().then((config) => {
+    if (config.privateRoomsEnabled) {
+      wireDiscoverProxy();
+    }
+  });
+}
+
+initPrivateRooms();

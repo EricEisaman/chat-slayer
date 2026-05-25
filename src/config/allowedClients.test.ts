@@ -4,6 +4,7 @@ import {
   parseAllowedClientsJson,
   clientAllowsOrigin,
   findAllowedClientById,
+  formatAllowedClientsLogLines,
 } from './allowedClients';
 
 function testNormalizeOrigin(): void {
@@ -38,6 +39,30 @@ function testParseAllowedClientsJson(): void {
   assert.throws(() => parseAllowedClientsJson('{"id":"dup"}'), /array/);
 }
 
+function testFormatAllowedClientsLogLines(): void {
+  const lines = formatAllowedClientsLogLines(
+    {
+      enforced: true,
+      clients: [
+        {
+          id: 'web-demo',
+          label: 'Web demo',
+          origins: ['https://chat-slayer.onrender.com'],
+          allowWithoutOrigin: false,
+        },
+      ],
+    },
+    'https://chat-slayer.onrender.com/',
+  );
+  assert.ok(lines.some((l) => l.includes('enforcement: on')));
+  assert.ok(
+    lines.some((l) =>
+      l.includes('origins=[https://chat-slayer.onrender.com]'),
+    ),
+  );
+  assert.ok(lines.some((l) => l.includes('BACKEND_PUBLIC_URL origin')));
+}
+
 function testClientLookup(): void {
   const clients = parseAllowedClientsJson(
     '[{"id":"a","origins":["https://x.com"]}]',
@@ -50,5 +75,6 @@ function testClientLookup(): void {
 
 testNormalizeOrigin();
 testParseAllowedClientsJson();
+testFormatAllowedClientsLogLines();
 testClientLookup();
 console.log('allowedClients.test.ts: ok');

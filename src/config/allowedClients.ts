@@ -216,6 +216,41 @@ export function findAllowedClientById(
   return clients.find(c => c.id === id);
 }
 
+/** One-line summaries for deploy / startup logs (no secrets). */
+export function formatAllowedClientsLogLines(
+  config: AllowedClientsConfig,
+  publicUrl?: string,
+): readonly string[] {
+  const lines: string[] = [
+    `Client access enforcement: ${config.enforced ? 'on' : 'off'}`,
+  ];
+  if (config.clients.length === 0) {
+    lines.push('Allowed clients: (none configured)');
+    return lines;
+  }
+  for (const client of config.clients) {
+    let originsText: string;
+    if (client.origins.length > 0) {
+      originsText = client.origins.join(', ');
+    } else if (client.allowWithoutOrigin) {
+      originsText = '(empty list; allowWithoutOrigin=true)';
+    } else {
+      originsText = '(empty list; browser Origin required)';
+    }
+    const label = client.label ? ` label="${client.label}"` : '';
+    lines.push(
+      `Allowed client id="${client.id}"${label}: origins=[${originsText}] allowWithoutOrigin=${client.allowWithoutOrigin}`,
+    );
+  }
+  const origin = normalizeOrigin(publicUrl);
+  if (origin) {
+    lines.push(
+      `BACKEND_PUBLIC_URL origin (auto-added to web-demo when missing from ALLOWED_CLIENTS): ${origin}`,
+    );
+  }
+  return lines;
+}
+
 export function clientAllowsOrigin(
   client: AllowedClientConfig,
   origin: string | undefined,

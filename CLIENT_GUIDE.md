@@ -110,7 +110,7 @@ Open http://localhost:8008/ on the **same origin** as the API. Use **Register** 
 
 **Live updates:** room list and inbox use **Datastar SSE** (`GET /demo/stream`, `cs` patches) — not Matrix `/sync` polling for the UI.
 
-**Optional E2EE:** [`demo/e2ee.mjs`](demo/e2ee.mjs) may call `GET /_matrix/client/r0/sync` for Olm/Megolm device keys only. Sends use `POST /demo/actions/send` with optional `X-Demo-Encrypted-Event`. Requires `npm run build:demo` (copies `crypto-sdk/`). See [demo/README.md](demo/README.md).
+**E2EE (default on):** [`demo/e2ee.mjs`](demo/e2ee.mjs) encrypts sends after login when `e2eeEnabled` is true in `window.__CS_DEMO_CONFIG__` / `GET /demo-config.json` (default). It may call `GET /_matrix/client/r0/sync` for Olm/Megolm device keys only. Set `DEMO_E2EE_ENABLED=false` to disable. Requires `npm run build:demo` (copies `crypto-sdk/`). See [demo/README.md](demo/README.md).
 
 The access token is sent as `Authorization: Bearer …` (not in the URL).
 

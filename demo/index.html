@@ -32,6 +32,7 @@
       type="module"
       src="https://cdn.jsdelivr.net/gh/starfederation/datastar@1.0.0/bundles/datastar.js"
     ></script>
+    __CS_DEMO_CONFIG_SCRIPT__
     <script type="module" src="/e2ee.mjs"></script>
     <script type="module" src="/private-rooms.mjs"></script>
   </head>
@@ -151,48 +152,56 @@
             aria-labelledby="credentials-heading"
           >
             <h2 id="credentials-heading">Account</h2>
-            <fieldset>
-              <legend class="visually-hidden">Credentials</legend>
-              <label>
-                User
-                <input
-                  class="field"
-                  data-bind:username
-                  autocomplete="username"
-                  minlength="3"
-                  pattern="[a-zA-Z0-9._=-]{3,255}"
-                />
-              </label>
-              <label>
-                Password
-                <input
-                  class="field"
-                  data-bind:password
-                  type="password"
-                  minlength="8"
-                  autocomplete="current-password"
-                />
-              </label>
-            </fieldset>
-            <div class="actions" role="group" aria-label="Authentication">
-              <button
-                type="button"
-                class="primary"
-                data-indicator:authPending
-                data-on:click="@post('/demo/actions/register', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo' } })"
-              >
-                Register
-              </button>
-              <button
-                type="button"
-                class="secondary"
-                data-indicator:authPending
-                data-on:click="@post('/demo/actions/login', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo' } })"
-              >
-                Login
-              </button>
-            </div>
-            <p data-show="$authPending" class="hint">Working…</p>
+            <form
+              class="auth-form"
+              action="#"
+              method="post"
+              autocomplete="on"
+              onsubmit="return false"
+            >
+              <fieldset>
+                <legend class="visually-hidden">Credentials</legend>
+                <label>
+                  User
+                  <input
+                    class="field"
+                    data-bind:username
+                    autocomplete="username"
+                    minlength="3"
+                    pattern="[a-zA-Z0-9._=-]{3,255}"
+                  />
+                </label>
+                <label>
+                  Password
+                  <input
+                    class="field"
+                    data-bind:password
+                    type="password"
+                    minlength="8"
+                    autocomplete="current-password"
+                  />
+                </label>
+              </fieldset>
+              <div class="actions" role="group" aria-label="Authentication">
+                <button
+                  type="button"
+                  class="primary"
+                  data-indicator:authPending
+                  data-on:click="@post('/demo/actions/register', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo' } })"
+                >
+                  Register
+                </button>
+                <button
+                  type="button"
+                  class="secondary"
+                  data-indicator:authPending
+                  data-on:click="@post('/demo/actions/login', { headers: { 'X-Chat-Slayer-Client-Id': 'web-demo' } })"
+                >
+                  Login
+                </button>
+              </div>
+              <p data-show="$authPending" class="hint">Working…</p>
+            </form>
           </section>
 
           <aside
@@ -400,7 +409,7 @@
                 <button
                   type="button"
                   class="primary"
-                  data-on:click="window.ChatSlayerE2ee ? window.ChatSlayerE2ee.queueSend() : window.queueSendPlain()"
+                  data-on:click="window.ChatSlayerE2ee && window.__CS_DEMO_CONFIG__?.e2eeEnabled !== false ? window.ChatSlayerE2ee.queueSend() : window.queueSendPlain()"
                 >
                   Send
                 </button>

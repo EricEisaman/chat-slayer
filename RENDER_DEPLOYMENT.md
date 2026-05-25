@@ -204,6 +204,8 @@ Production enforces the client gate by default. The **built-in demo UI** is serv
 
 Replace `your-service` with your Render hostname. The server also adds `BACKEND_PUBLIC_URL` to `web-demo` origins when that client is listed.
 
+On each deploy/start, the service logs **client access enforcement** and every allowed **client id** with its **origins** list (and whether `allowWithoutOrigin` is set). Check Render **Logs** right after boot to confirm your Dashboard env matches what the process loaded.
+
 - External browser UIs need their exact HTTPS origin in `origins`.
 - Scripts use `X-Chat-Slayer-Client-Id: ops-cli` without an `Origin` header when `allowWithoutOrigin` is `true`.
 - `GET /health` and static demo assets do not require a client id; Matrix API routes and demo API routes do when enforcement is on.
