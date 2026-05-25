@@ -106,11 +106,27 @@ export function renderRoomPickerOptionsHtml(
 
 export const ROOM_PICKER_SELECTOR = '#room-picker';
 
-export function renderInboxHtml(lines: readonly MessageLine[]): string {
-  if (lines.length === 0) {
+/** Messages visible for the active room picker selection. */
+export function filterInboxForRoom(
+  lines: readonly MessageLine[],
+  activeRoomId: string,
+): readonly MessageLine[] {
+  const roomId = activeRoomId.trim();
+  if (!roomId) {
+    return [];
+  }
+  return lines.filter((line) => line.room_id === roomId);
+}
+
+export function renderInboxHtml(
+  lines: readonly MessageLine[],
+  activeRoomId = '',
+): string {
+  const visible = filterInboxForRoom(lines, activeRoomId);
+  if (visible.length === 0) {
     return '<div id="inbox" class="inbox"><p class="empty">No messages yet — join a room and send one.</p></div>';
   }
-  const items = lines
+  const items = visible
     .map((line) => {
       const payloadAttr = line.event_payload
         ? ` data-event-payload="${escapeHtml(line.event_payload)}"`

@@ -3,12 +3,11 @@ import type {StoredTimelineEvent} from '../fi/cs/matrix/server/roomTimeline';
 import {
   buildLiveSnapshotSignalPatch,
   buildRoomDirectorySignalPatch,
-  buildRoomMessageSignalPatch,
+  buildRoomMessageInboxSignalPatch,
 } from './demoLiveSignals';
 import type {MessageLine} from './demoHtml';
 import {messageLineFromTimelineEvent} from './demoMessageLine';
 import {
-  type DemoElementPatchOptions,
   patchDemoInboxUi,
   patchDemoRoomUi,
 } from './demoRoomUiPatch';
@@ -18,7 +17,7 @@ export interface DemoSseWriter {
   readonly patchSignals: (json: string) => void;
   readonly patchElements: (
     html: string,
-    options?: DemoElementPatchOptions,
+    options?: import('./demoRoomUiPatch').DemoElementPatchOptions,
   ) => void;
 }
 
@@ -30,7 +29,10 @@ export interface DemoSseSubscriber {
   readonly writer: DemoSseWriter;
   lastActivityAt: number;
   lastStreamPos: number;
+  /** Full timeline for all joined rooms (not filtered by active room). */
   inboxLines: MessageLine[];
+  /** Active room from picker; drives filtered inbox UI. */
+  selectedRoomId: string;
 }
 
 export class DemoEventHub {
@@ -75,9 +77,7 @@ export class DemoEventHub {
       return;
     }
     for (const sub of this._subscribers.values()) {
-      const rooms = listDemoRoomsForUser(server, sub.internalUserId);
-      sub.writer.patchSignals(buildRoomDirectorySignalPatch(rooms));
-      patchDemoRoomUi(sub.writer.patchElements.bind(sub.writer), rooms);
+      this.syncSubscriberRooms(sub);
       sub.lastActivityAt = Date.now();
     }
   }
@@ -92,33 +92,62 @@ export class DemoEventHub {
       if (!server.isRoomMember(event.roomId, sub.matrixUserId)) {
         continue;
       }
-      sub.inboxLines.push(line);
-      sub.writer.patchSignals(
-        JSON.stringify({
-          ...JSON.parse(buildRoomMessageSignalPatch(line)),
-          inbox: sub.inboxLines,
-        }),
-      );
-      patchDemoInboxUi(sub.writer.patchElements.bind(sub.writer), sub.inboxLines);
+      this.appendInboxLine(sub, line);
       if (event.streamPos > sub.lastStreamPos) {
         sub.lastStreamPos = event.streamPos;
+      }
+      if (event.roomId === sub.selectedRoomId) {
+        sub.writer.patchSignals(
+          buildRoomMessageInboxSignalPatch(
+            line,
+            sub.inboxLines,
+            sub.selectedRoomId,
+          ),
+        );
+        this.patchSubscriberInboxElement(sub);
       }
       sub.lastActivityAt = Date.now();
     }
   }
 
-  public pushSnapshotToSubscriber(
+  /** Refresh room list and picker; does not mutate inbox history. */
+  public syncSubscriberRooms(
     subscriber: DemoSseSubscriber,
-    selectedRoomId = '',
+    selectedRoomId?: string,
   ): void {
+    if (selectedRoomId !== undefined) {
+      subscriber.selectedRoomId = selectedRoomId;
+    }
     const server = this._matrixServer;
     if (!server) {
       return;
     }
     const rooms = listDemoRoomsForUser(server, subscriber.internalUserId);
+    subscriber.writer.patchSignals(
+      buildLiveSnapshotSignalPatch(
+        rooms,
+        subscriber.inboxLines,
+        subscriber.selectedRoomId,
+      ),
+    );
+    patchDemoRoomUi(
+      subscriber.writer.patchElements.bind(subscriber.writer),
+      rooms,
+      subscriber.selectedRoomId,
+    );
+    this.patchSubscriberInboxElement(subscriber);
+    subscriber.lastActivityAt = Date.now();
+  }
+
+  /** Replace inbox from full timeline (stream connect / recovery). */
+  public rebuildSubscriberInbox(subscriber: DemoSseSubscriber): void {
+    const server = this._matrixServer;
+    if (!server) {
+      return;
+    }
     const messages = server.getTimelineEventsForUser(
       subscriber.matrixUserId,
-      subscriber.lastStreamPos,
+      0,
     );
     subscriber.inboxLines = messages.map(messageLineFromTimelineEvent);
     for (const event of messages) {
@@ -126,28 +155,88 @@ export class DemoEventHub {
         subscriber.lastStreamPos = event.streamPos;
       }
     }
+    this.patchSubscriberUi(subscriber);
+  }
+
+  /** Append timeline events since lastStreamPos (idle resync). */
+  public appendSubscriberInbox(subscriber: DemoSseSubscriber): void {
+    const server = this._matrixServer;
+    if (!server) {
+      return;
+    }
+    const messages = server.getTimelineEventsForUser(
+      subscriber.matrixUserId,
+      subscriber.lastStreamPos,
+    );
+    for (const event of messages) {
+      const line = messageLineFromTimelineEvent(event);
+      this.appendInboxLine(subscriber, line);
+      if (event.streamPos > subscriber.lastStreamPos) {
+        subscriber.lastStreamPos = event.streamPos;
+      }
+    }
+    if (messages.length > 0) {
+      this.patchSubscriberUi(subscriber);
+    }
+  }
+
+  /** Patch Datastar signals and inbox DOM for current rooms + active room filter. */
+  public patchSubscriberUi(subscriber: DemoSseSubscriber): void {
+    const server = this._matrixServer;
+    if (!server) {
+      return;
+    }
+    const rooms = listDemoRoomsForUser(server, subscriber.internalUserId);
     subscriber.writer.patchSignals(
-      buildLiveSnapshotSignalPatch(rooms, subscriber.inboxLines),
+      buildLiveSnapshotSignalPatch(
+        rooms,
+        subscriber.inboxLines,
+        subscriber.selectedRoomId,
+      ),
     );
     patchDemoRoomUi(
       subscriber.writer.patchElements.bind(subscriber.writer),
       rooms,
-      selectedRoomId,
+      subscriber.selectedRoomId,
     );
-    patchDemoInboxUi(
-      subscriber.writer.patchElements.bind(subscriber.writer),
-      subscriber.inboxLines,
-    );
+    this.patchSubscriberInboxElement(subscriber);
     subscriber.lastActivityAt = Date.now();
+  }
+
+  public setSelectedRoom(
+    subscriber: DemoSseSubscriber,
+    selectedRoomId: string,
+  ): void {
+    subscriber.selectedRoomId = selectedRoomId;
+    this.patchSubscriberUi(subscriber);
   }
 
   public resyncIdleSubscribers(inactiveMs: number): void {
     const now = Date.now();
     for (const sub of this._subscribers.values()) {
       if (now - sub.lastActivityAt >= inactiveMs) {
-        this.pushSnapshotToSubscriber(sub);
+        this.appendSubscriberInbox(sub);
+        this.syncSubscriberRooms(sub);
       }
     }
+  }
+
+  private appendInboxLine(
+    subscriber: DemoSseSubscriber,
+    line: MessageLine,
+  ): void {
+    if (subscriber.inboxLines.some((existing) => existing.event_id === line.event_id)) {
+      return;
+    }
+    subscriber.inboxLines.push(line);
+  }
+
+  private patchSubscriberInboxElement(subscriber: DemoSseSubscriber): void {
+    patchDemoInboxUi(
+      subscriber.writer.patchElements.bind(subscriber.writer),
+      subscriber.inboxLines,
+      subscriber.selectedRoomId,
+    );
   }
 }
 

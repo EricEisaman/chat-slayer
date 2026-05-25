@@ -1,4 +1,5 @@
 import type {MessageLine, RoomListEntry} from './demoHtml';
+import {filterInboxForRoom} from './demoHtml';
 import {
   chatSlayerSignalPatch,
   stringifyChatSlayerSignalPatch,
@@ -25,13 +26,28 @@ export function buildInboxSignalPatch(lines: readonly MessageLine[]): string {
 
 export function buildLiveSnapshotSignalPatch(
   rooms: readonly RoomListEntry[],
-  inbox: readonly MessageLine[],
+  allInboxLines: readonly MessageLine[],
+  selectedRoomId = '',
 ): string {
+  const inbox = filterInboxForRoom(allInboxLines, selectedRoomId);
   return JSON.stringify({
     ...chatSlayerSignalPatch('room-directory', {rooms}),
     rooms,
+    roomId: selectedRoomId,
     inbox,
     streamReady: true,
+  });
+}
+
+export function buildRoomMessageInboxSignalPatch(
+  line: MessageLine,
+  allInboxLines: readonly MessageLine[],
+  selectedRoomId: string,
+): string {
+  return JSON.stringify({
+    ...JSON.parse(buildRoomMessageSignalPatch(line)),
+    roomId: selectedRoomId,
+    inbox: filterInboxForRoom(allInboxLines, selectedRoomId),
   });
 }
 

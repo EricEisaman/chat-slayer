@@ -27,7 +27,9 @@ export function respondDemoActionSignals(
       patchDemoRoomUi(patch, rooms, selected);
     }
     if (inbox) {
-      patchDemoInboxUi(patch, inbox);
+      const activeRoomId =
+        typeof signalPatch.roomId === 'string' ? signalPatch.roomId : '';
+      patchDemoInboxUi(patch, inbox, activeRoomId);
     }
   });
 }

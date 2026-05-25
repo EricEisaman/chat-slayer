@@ -41,6 +41,7 @@ export function patchDemoRoomUi(
 export function patchDemoInboxUi(
   patch: DemoElementPatcher,
   inbox: readonly MessageLine[],
+  activeRoomId = '',
 ): void {
-  patch(renderInboxHtml(inbox));
+  patch(renderInboxHtml(inbox, activeRoomId));
 }

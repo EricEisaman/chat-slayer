@@ -11,6 +11,8 @@ Browser UI at `/` on the same process and port as the API (default `http://local
 
 Room list and inbox updates use SSE (`cs` patches). They do not use Matrix `/sync` polling. E2EE may call `/sync` only for device-key exchange.
 
+The **message panel** shows only messages for the **Active room** selected in the dropdown. Switching rooms updates the filter; history is kept server-side per tab so messages reappear when you switch back.
+
 `window.__CS_DEMO_CONFIG__` is injected in the HTML at serve time (same fields as `/demo-config.json`). **E2EE is enabled by default** (`e2eeEnabled: true`); set `DEMO_E2EE_ENABLED=false` to force plaintext sends.
 
 `privateRoomsEnabled` is `true` only when the server has `BACKEND_PRIVATE_ROOMS` set (no room names are exposed). Boot-seeded **public** rooms from `BACKEND_INITIAL_ROOMS` appear in the room list and in the **Active room** dropdown under **Public rooms** (green = private, blue = public in the closed picker and list).

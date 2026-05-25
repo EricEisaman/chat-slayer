@@ -10,7 +10,6 @@ import {createMatrixTextMessageDTO} from '../fi/cs/matrix/types/message/textMess
 import {injectDemoPageMeta} from './demoPageMeta';
 import {getDemoStaticRoot} from './serveDemoStatic';
 import {getDemoEventHub, type DemoSseSubscriber} from './DemoEventHub';
-import {messageLineFromTimelineEvent} from './demoMessageLine';
 import {chatSlayerSignalPatch} from './chatSlayerSignalPatch';
 import {directoryActionSignalPatch} from './demoLiveSignals';
 import {
@@ -32,6 +31,7 @@ import {
   readEncryptedRoomEvent,
   readSendMessage,
 } from './demoActionInput';
+import {filterInboxForRoom} from './demoHtml';
 import {listDemoRoomsForUser} from './demoRooms';
 import {applyCorsHeaders} from '../fi/cs/node/CorsResponseContext';
 import {
@@ -210,7 +210,7 @@ async function handleDiscoverPrivateRoom(
     const rooms = listDemoRoomsForUser(server, session.internalUserId);
     const sub = getDemoEventHub().getSubscriberByAccessToken(accessToken);
     if (sub) {
-      getDemoEventHub().pushSnapshotToSubscriber(sub, joined);
+      getDemoEventHub().setSelectedRoom(sub, joined);
     }
     respondDemoActionSignals(
       req,
@@ -256,7 +256,7 @@ async function handleCreateRoom(
     const rooms = listDemoRoomsForUser(server, session.internalUserId);
     const sub = getDemoEventHub().getSubscriberByAccessToken(accessToken);
     if (sub) {
-      getDemoEventHub().pushSnapshotToSubscriber(sub, joined);
+      getDemoEventHub().setSelectedRoom(sub, joined);
     }
     respondDemoActionSignals(
       req,
@@ -295,7 +295,7 @@ async function handleJoinRoom(
     const rooms = listDemoRoomsForUser(server, session.internalUserId);
     const sub = getDemoEventHub().getSubscriberByAccessToken(accessToken);
     if (sub) {
-      getDemoEventHub().pushSnapshotToSubscriber(sub, joined);
+      getDemoEventHub().setSelectedRoom(sub, joined);
     }
     respondDemoActionSignals(
       req,
@@ -356,14 +356,13 @@ async function handleSend(
     const hub = getDemoEventHub();
     hub.touchByAccessToken(accessToken);
     const sub = hub.getSubscriberByAccessToken(accessToken);
-    const inbox =
-      sub?.inboxLines ??
-      server
-        .getTimelineEventsForUser(session.matrixUserId, 0)
-        .map(messageLineFromTimelineEvent);
     if (sub) {
-      sub.inboxLines = inbox;
+      sub.selectedRoomId = roomId;
+      hub.patchSubscriberUi(sub);
     }
+    const filteredInbox = sub
+      ? filterInboxForRoom(sub.inboxLines, roomId)
+      : [];
     respondDemoActionSignals(
       req,
       res,
@@ -371,10 +370,10 @@ async function handleSend(
         roomId,
         message: '',
         status: `Sent (${eventId})`,
-        inbox,
+        inbox: filteredInbox,
       },
       undefined,
-      inbox,
+      sub?.inboxLines,
     );
   } catch (err) {
     respondDemoActionError(req, res, matrixErrorToMessage(err));
@@ -420,6 +419,7 @@ async function handleStream(
           lastActivityAt: Date.now(),
           lastStreamPos: 0,
           inboxLines: [],
+          selectedRoomId: '',
               writer: {
                 patchSignals: (json: string) => {
                   stream.patchSignals(json);
@@ -430,7 +430,7 @@ async function handleStream(
               },
         };
         hub.subscribe(subscriber);
-        hub.pushSnapshotToSubscriber(subscriber);
+        hub.rebuildSubscriberInbox(subscriber);
 
         idleTimer = setInterval(() => {
           hub.resyncIdleSubscribers(inactiveMs);
