@@ -61,8 +61,8 @@ For a two-browser smoke test, see [demo/README.md](demo/README.md).
 | `start-prod` | `build:demo` + `node dist/chat-slayer.cjs` |
 | `start-prod:deploy` | Production-mode env checks + `node dist/chat-slayer.cjs` (run after `npm run build`) |
 | `pkill` | Stop processes on port 8008 and stray vite-node/chat-slayer runs |
-| `render:gen:env` | Generate Render Dashboard env vars (colored copy-paste guide; see [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)) |
-| `render:deploy:test` | Preflight Render deploy (npm 10.9 lockfile + production build; run before push) |
+| `render:gen:env` | Generate Render Dashboard env vars (sections A–G; Section G = fingerprint hash verification — see [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md#fingerprint-hash-verification)) |
+| `render:deploy:test` | Preflight Render deploy (npm 10.9 lockfile + production build; run before push; prints two-phase TLS next steps) |
 | `test` | Vitest-node unit tests |
 | `lint` / `fix` / `typecheck` | See [STYLEGUIDE.md](STYLEGUIDE.md) |
 
@@ -118,7 +118,7 @@ docker-compose up
 
 ### Deploy on Render
 
-See **[RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)** for blueprint steps, secrets, free-tier behavior, and verification.
+See **[RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)** for blueprint steps, secrets, free-tier behavior, [fingerprint hash verification](RENDER_DEPLOYMENT.md#fingerprint-hash-verification), and post-deploy checks.
 
 - Set `BACKEND_JWT_SECRET` (Secret) and `BACKEND_PUBLIC_URL` (`https://<your-service>.onrender.com`) in the Dashboard.
 - Do **not** set `PORT` — Render injects it.

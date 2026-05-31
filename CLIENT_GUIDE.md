@@ -6,7 +6,7 @@ Chat Slayer can restrict which applications may call Matrix client APIs. Each re
 X-Chat-Slayer-Client-Id: <your-client-id>
 ```
 
-Render health checks (`GET /health`) and demo static assets (`GET /`, `/demo.css`, `/assets/*`, `/demo-config.json`, `/favicon.ico`, `/e2ee.mjs`, `/crypto-sdk/*`) are exempt and do not need this header. Demo **API** routes (`GET /demo/stream`, `POST /demo/actions/*`) require `X-Chat-Slayer-Client-Id` when enforcement is on (same as Matrix APIs).
+Render health checks (`GET /health`), `GET /.well-known/chat-slayer.json`, and demo static assets (`GET /`, `/demo.css`, `/assets/*`, `/demo-config.json`, `/favicon.ico`, `/fingerprint.mjs`, `/e2ee.mjs`, `/crypto-sdk/*`) are exempt and do not need this header. Demo **API** routes (`GET /demo/stream`, `POST /demo/actions/*`) require `X-Chat-Slayer-Client-Id` when enforcement is on (same as Matrix APIs).
 
 ## Environment variables
 
@@ -26,7 +26,9 @@ Render health checks (`GET /health`) and demo static assets (`GET /`, `/demo.css
   "id": "web-demo",
   "label": "Demo web UI",
   "origins": ["http://localhost:8008", "https://myapp.example.com"],
-  "allowWithoutOrigin": false
+  "allowWithoutOrigin": false,
+  "expectedTlsFingerprintSha256": "<64 hex SPKI SHA-256 from operator gold-standard>",
+  "expectedTlsFingerprintBackupSha256": "<optional backup pin for cert rotation>"
 }
 ```
 
@@ -36,6 +38,8 @@ Render health checks (`GET /health`) and demo static assets (`GET /`, `/demo.css
 | `label` | No | Human-readable name (logs/docs only). |
 | `origins` | No | Browser origins allowed for this client (`scheme://host:port`). |
 | `allowWithoutOrigin` | No | Default `false`. If `true`, allows curl/scripts with only the client id header (no `Origin`). |
+| `expectedTlsFingerprintSha256` | No | Gold-standard TLS **SPKI SHA-256** pin (out-of-band; see [TLS fingerprint pinning](#tls-fingerprint-pinning-grc-style)). |
+| `expectedTlsFingerprintBackupSha256` | No | Optional backup pin during certificate rotation. |
 
 ### Browser (web) client
 
@@ -49,6 +53,49 @@ Render health checks (`GET /health`) and demo static assets (`GET /`, `/demo.css
 - Set `allowWithoutOrigin` to `true`.
 - Send `X-Chat-Slayer-Client-Id` on every request.
 - No `Origin` header is required.
+
+## TLS fingerprint pinning (GRC-style)
+
+Chat Slayer publishes its TLS **SPKI SHA-256** fingerprint to help clients detect SSL interception (corporate MITM, rogue CA, DNS hijack).
+
+| Source | URL / header |
+|--------|----------------|
+| Well-known document | `GET /.well-known/chat-slayer.json` → `tlsFingerprintSha256` |
+| Response header | `X-Chat-Slayer-TLS-Fingerprint-SHA256` |
+| Demo inline config | `window.__CS_DEMO_CONFIG__.expectedTlsFingerprintSha256` |
+
+**Gold-standard pin:** obtain out-of-band via [GRC fingerprints](https://www.grc.com/fingerprints.htm) or:
+
+```bash
+openssl s_client -connect your-host:443 -servername your-host </dev/null 2>/dev/null \
+  | openssl x509 -pubkey -noout \
+  | openssl pkey -pubin -outform der \
+  | openssl dgst -sha256
+```
+
+Set the same value in `BACKEND_TLS_FINGERPRINT_SHA256` (server) and `expectedTlsFingerprintSha256` on each client entry (browser/CLI config).
+
+### Browser demo
+
+[`demo/fingerprint.mjs`](demo/fingerprint.mjs) runs on page load when `pinEnforced` is true. On mismatch it alerts the user, calls `POST /demo/actions/report-tls-pin-failure`, and blocks further API calls. The server disables that client id in-memory until restart.
+
+**Limitation:** JavaScript cannot read the TLS certificate directly. The expected pin must come from a trusted channel separate from the first page load (Dashboard `ALLOWED_CLIENTS`, release notes, operator docs)—same model as [GRC fingerprint verification](https://www.grc.com/fingerprints.htm).
+
+### Node / CLI clients
+
+Validate the pin when connecting over HTTPS before sending credentials:
+
+```typescript
+import { probeTlsSpkiSha256 } from './src/security/tlsFingerprintProbe';
+import { fingerprintMatchesExpected } from './src/security/validateTlsPin';
+
+const observed = await probeTlsSpkiSha256('https://chat-slayer.onrender.com');
+if (!fingerprintMatchesExpected(observed, expectedPin, backupPin)) {
+  throw new Error('TLS fingerprint mismatch — possible MITM');
+}
+```
+
+Report failures to `POST /demo/actions/report-tls-pin-failure` with JSON `{ observedFingerprint, expectedFingerprint, source }` and header `X-Chat-Slayer-Client-Id`.
 
 ## Example `ALLOWED_CLIENTS` (local + script)
 

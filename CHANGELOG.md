@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **TLS fingerprint pinning (GRC-style MITM defense):** SPKI SHA-256 pins via `BACKEND_TLS_FINGERPRINT_SHA256`, startup TLS probe, `GET /.well-known/chat-slayer.json`, response header `X-Chat-Slayer-TLS-Fingerprint-SHA256`, demo [`fingerprint.mjs`](demo/fingerprint.mjs) validation, and `POST /demo/actions/report-tls-pin-failure` to auto-disable a client id on mismatch.
+- `expectedTlsFingerprintSha256` / `expectedTlsFingerprintBackupSha256` on `ALLOWED_CLIENTS` entries.
+- `Strict-Transport-Security` on production HTTPS responses.
+- `render:gen:env` Section G — OpenSSL / [GRC fingerprints](https://www.grc.com/fingerprints.htm) pin instructions; two-phase deploy documented in [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md).
+
 ## [0.0.1] - 2026-05-25
 
 First public release.

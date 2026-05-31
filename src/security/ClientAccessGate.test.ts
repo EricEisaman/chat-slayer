@@ -3,6 +3,10 @@ import type {IncomingMessage} from 'http';
 import {resetAllowedClientsConfigCache} from '../config/allowedClients';
 import {evaluateClientAccess} from './ClientAccessGate';
 import type {AllowedClientsConfig} from '../config/allowedClients';
+import {
+  disableClient,
+  resetDisabledClientsRegistry,
+} from './DisabledClientsRegistry';
 
 function mockReq(opts: {
   method?: string;
@@ -113,13 +117,44 @@ function testMissingClientId(): void {
   assert.equal(d.allowed, false);
 }
 
+function testWellKnownExempt(): void {
+  const d = evaluateClientAccess(
+    mockReq({method: 'GET', url: '/.well-known/chat-slayer.json'}),
+    sampleConfig,
+  );
+  assert.equal(d.allowed, true);
+}
+
+function testDisabledClientDenied(): void {
+  resetDisabledClientsRegistry();
+  disableClient({
+    clientId: 'web-demo',
+    reason: 'pin mismatch',
+  });
+  const d = evaluateClientAccess(
+    mockReq({
+      url: '/_matrix/client/r0/login',
+      headers: {
+        origin: 'http://localhost:8008',
+        'x-chat-slayer-client-id': 'web-demo',
+      },
+    }),
+    sampleConfig,
+  );
+  assert.equal(d.allowed, false);
+  assert.ok(d.reason?.includes('disabled'));
+  resetDisabledClientsRegistry();
+}
+
 resetAllowedClientsConfigCache();
 testHealthExempt();
 testDemoStaticExempt();
 testDemoConfigJsonPublic();
+testWellKnownExempt();
 testEnforcementOff();
 testBrowserClient();
 testDenyWrongOrigin();
 testCliWithoutOrigin();
 testMissingClientId();
+testDisabledClientDenied();
 console.log('ClientAccessGate.test.ts: ok');

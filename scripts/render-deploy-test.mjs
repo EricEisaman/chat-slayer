@@ -70,6 +70,11 @@ Steps:
   3. Artifacts — dist/chat-slayer.cjs and demo bundle
   4. Runner deps — npm@10.9.0 ci --omit=dev in temp dir
 
+After this passes, deploy to Render (see RENDER_DEPLOYMENT.md two-phase TLS checklist):
+  Phase 1 — first deploy: BACKEND_TLS_PIN_ENFORCED=false
+  Phase 2 — after HTTPS is live:
+    npm run render:gen:env -- --url https://<your-service>.onrender.com
+
 Options:
   --clean     Remove node_modules before step 2
   --docker    Also run docker build (if docker is installed)
@@ -201,9 +206,15 @@ function main() {
   println('bold green', 'All preflight checks passed.', useColor);
   println(
     'dim',
-    'Next: npm run render:gen:env  →  set Render Dashboard env  →  git push / deploy',
+    'Next (new service, phase 1): npm run render:gen:env  →  Dashboard env + BACKEND_TLS_PIN_ENFORCED=false  →  git push / deploy',
     useColor,
   );
+  println(
+    'dim',
+    'Next (after HTTPS live, phase 2): npm run render:gen:env -- --url https://<service>.onrender.com  →  add TLS pin  →  BACKEND_TLS_PIN_ENFORCED=true  →  redeploy',
+    useColor,
+  );
+  println('dim', 'See RENDER_DEPLOYMENT.md § Fingerprint hash verification', useColor);
 }
 
 try {

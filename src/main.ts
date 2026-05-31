@@ -23,9 +23,12 @@ import {
   ALLOWED_CLIENTS_CONFIG,
   FEDERATION_URL,
   FEDERATION_ENABLED,
+  SERVER_FINGERPRINT_CONFIG,
 } from './constants/runtime';
 import {formatAllowedClientsLogLines} from './config/allowedClients';
+import {isDeployProduction} from './config/deployMode';
 import {validateProductionEnv} from './config/validateEnv';
+import {validateTlsFingerprintAtStartup} from './security/tlsFingerprintProbe';
 import {BUILD_USAGE_URL, BUILD_WITH_FULL_USAGE} from './constants/build';
 
 import {LogService} from './fi/cs/core/LogService';
@@ -69,6 +72,20 @@ const LOG = LogService.createLogger('main');
 export async function main(args: string[] = []): Promise<CommandExitStatus> {
   try {
     validateProductionEnv();
+
+    const tlsResult = await validateTlsFingerprintAtStartup(
+      BACKEND_PUBLIC_URL,
+      SERVER_FINGERPRINT_CONFIG,
+      {
+        failFast:
+          isDeployProduction() && SERVER_FINGERPRINT_CONFIG.pinEnforced,
+      },
+    );
+    if (tlsResult.liveFingerprint) {
+      LOG.info(`TLS SPKI SHA-256 fingerprint: ${tlsResult.liveFingerprint}`);
+    } else if (SERVER_FINGERPRINT_CONFIG.pinEnforced) {
+      LOG.info('TLS fingerprint pinning enforced (no live probe on this URL)');
+    }
 
     for (const line of formatAllowedClientsLogLines(
       ALLOWED_CLIENTS_CONFIG,

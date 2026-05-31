@@ -15,6 +15,8 @@ The **message panel** shows only messages for the **Active room** selected in th
 
 `window.__CS_DEMO_CONFIG__` is injected in the HTML at serve time (same fields as `/demo-config.json`). **E2EE is enabled by default** (`e2eeEnabled: true`); set `DEMO_E2EE_ENABLED=false` to force plaintext sends.
 
+**TLS fingerprint pinning:** [`fingerprint.mjs`](fingerprint.mjs) validates the server SPKI SHA-256 on load when `pinEnforced` is true (production HTTPS). On mismatch the UI is blocked and the client id is disabled server-side. See [CLIENT_GUIDE.md](../CLIENT_GUIDE.md#tls-fingerprint-pinning-grc-style).
+
 `privateRoomsEnabled` is `true` only when the server has `BACKEND_PRIVATE_ROOMS` set (no room names are exposed). Boot-seeded **public** rooms from `BACKEND_INITIAL_ROOMS` appear in the room list and in the **Active room** dropdown under **Public rooms** (green = private, blue = public in the closed picker and list).
 
 ## Run
@@ -34,8 +36,9 @@ All demo actions send `X-Chat-Slayer-Client-Id: web-demo` when client access is 
 |-------|--------|---------|
 | `/` | GET | Demo HTML |
 | `/demo.css`, `/assets/*`, `/favicon.ico` | GET | Static assets |
-| `/e2ee.mjs`, `/crypto-sdk/*` | GET | E2EE module + WASM |
-| `/demo-config.json` | GET | Public demo flags (`e2eeEnabled`, `privateRoomsEnabled`, client id, API base) — no client header |
+| `/e2ee.mjs`, `/fingerprint.mjs`, `/crypto-sdk/*` | GET | E2EE + TLS pin modules + WASM |
+| `/demo-config.json` | GET | Public demo flags (`e2eeEnabled`, `pinEnforced`, `expectedTlsFingerprintSha256`, etc.) — no client header |
+| `/.well-known/chat-slayer.json` | GET | Server TLS fingerprint document — no client header |
 | `/demo/stream` | GET | Long-lived SSE (`Authorization: Bearer`) |
 | `/demo/actions/register` | POST | Register |
 | `/demo/actions/login` | POST | Login |
@@ -43,6 +46,7 @@ All demo actions send `X-Chat-Slayer-Client-Id: web-demo` when client access is 
 | `/demo/actions/register-rooms` | POST | Ensure many named rooms exist |
 | `/demo/actions/join-room` | POST | Join `roomId` |
 | `/demo/actions/send` | POST | Send message (plaintext or encrypted header) |
+| `/demo/actions/report-tls-pin-failure` | POST | Report TLS pin mismatch (JSON body); may disable client id |
 | `/health` | GET | Health check (no client id) |
 
 ## SSE configuration

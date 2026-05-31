@@ -9,7 +9,7 @@
     "fix": "gts fix",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
-    "test": "vite-node src/config/allowedClients.test.ts && vite-node src/security/ClientAccessGate.test.ts && vite-node src/demo/demoStreamAuth.test.ts && vite-node src/demo/demoActionInput.test.ts && vite-node src/demo/demoEventHub.test.ts && vite-node src/fi/cs/matrix/server/matrixRegistration.test.ts && vite-node src/fi/cs/matrix/server/roomUniqueness.test.ts && vite-node src/fi/cs/matrix/server/roomBatchRegistration.test.ts && vite-node src/fi/cs/matrix/server/roomTimelineHistory.test.ts && vite-node src/fi/cs/matrix/server/preconfiguredPrivateRooms.test.ts && vite-node src/fi/cs/core/requestServer/utils/RouteUtils.test.ts",
+    "test": "vite-node src/config/allowedClients.test.ts && vite-node src/security/ClientAccessGate.test.ts && vite-node src/security/tlsFingerprintProbe.test.ts && vite-node src/security/DisabledClientsRegistry.test.ts && vite-node src/security/wellKnownChatSlayer.test.ts && vite-node src/demo/demoStreamAuth.test.ts && vite-node src/demo/demoActionInput.test.ts && vite-node src/demo/demoEventHub.test.ts && vite-node src/fi/cs/matrix/server/matrixRegistration.test.ts && vite-node src/fi/cs/matrix/server/roomUniqueness.test.ts && vite-node src/fi/cs/matrix/server/roomBatchRegistration.test.ts && vite-node src/fi/cs/matrix/server/roomTimelineHistory.test.ts && vite-node src/fi/cs/matrix/server/preconfiguredPrivateRooms.test.ts && vite-node src/fi/cs/core/requestServer/utils/RouteUtils.test.ts",
     "build": "vite build && npm run build:demo",
     "build:demo": "node demo/build.mjs",
     "dev": "npm run build:demo && vite-node src/chat-slayer.ts",

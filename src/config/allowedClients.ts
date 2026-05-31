@@ -1,4 +1,5 @@
 import {isDeployProduction} from './deployMode';
+import {normalizeSha256Hex} from './serverFingerprint';
 import {parseNonEmptyString} from '../fi/cs/core/types/String';
 import {isArray} from '../fi/cs/core/types/Array';
 import {isString} from '../fi/cs/core/types/String';
@@ -14,6 +15,9 @@ export interface AllowedClientConfig {
   readonly label?: string;
   readonly origins: readonly string[];
   readonly allowWithoutOrigin: boolean;
+  /** Gold-standard TLS SPKI SHA-256 pin (out-of-band, per GRC fingerprint practice). */
+  readonly expectedTlsFingerprintSha256?: string;
+  readonly expectedTlsFingerprintBackupSha256?: string;
 }
 
 export interface AllowedClientsConfig {
@@ -50,7 +54,11 @@ function isAllowedClientEntry(value: unknown): value is AllowedClientConfig {
     (origins === undefined ||
       (isArray(origins) && origins.every(o => isString(o)))) &&
     (value.allowWithoutOrigin === undefined ||
-      typeof value.allowWithoutOrigin === 'boolean')
+      typeof value.allowWithoutOrigin === 'boolean') &&
+    (value.expectedTlsFingerprintSha256 === undefined ||
+      isString(value.expectedTlsFingerprintSha256)) &&
+    (value.expectedTlsFingerprintBackupSha256 === undefined ||
+      isString(value.expectedTlsFingerprintBackupSha256))
   );
 }
 
@@ -118,11 +126,20 @@ function normalizeClientEntry(entry: AllowedClientConfig): AllowedClientConfig {
   const origins = (entry.origins ?? [])
     .map(o => normalizeOrigin(o) ?? o)
     .filter(o => o.length > 0);
+  const expectedTlsFingerprintSha256 = entry.expectedTlsFingerprintSha256
+    ? normalizeSha256Hex(entry.expectedTlsFingerprintSha256)
+    : undefined;
+  const expectedTlsFingerprintBackupSha256 =
+    entry.expectedTlsFingerprintBackupSha256
+      ? normalizeSha256Hex(entry.expectedTlsFingerprintBackupSha256)
+      : undefined;
   return {
     id: entry.id.trim(),
     label: entry.label,
     origins,
     allowWithoutOrigin: entry.allowWithoutOrigin === true,
+    expectedTlsFingerprintSha256,
+    expectedTlsFingerprintBackupSha256,
   };
 }
 
@@ -153,6 +170,9 @@ export function parseAllowedClientsJson(
       label: item.label,
       origins: item.origins ?? [],
       allowWithoutOrigin: item.allowWithoutOrigin === true,
+      expectedTlsFingerprintSha256: item.expectedTlsFingerprintSha256,
+      expectedTlsFingerprintBackupSha256:
+        item.expectedTlsFingerprintBackupSha256,
     });
     if (seenIds.has(normalized.id)) {
       throw new TypeError(

@@ -55,6 +55,9 @@ function fireDatastarSend(roomId, encrypted, plaintext) {
 }
 
 async function matrixAuthFetch(path, init = {}) {
+  if (window.__CS_PIN_FAILED__) {
+    throw new Error('TLS fingerprint validation failed; API calls blocked');
+  }
   const headers = {
     [CLIENT_HEADER]: CLIENT_ID,
     Authorization: `Bearer ${session.accessToken}`,

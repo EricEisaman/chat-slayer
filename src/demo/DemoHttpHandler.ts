@@ -3,7 +3,17 @@ import {join} from 'node:path';
 import type {IncomingMessage, ServerResponse} from 'http';
 import {ServerSentEventGenerator} from '@starfederation/datastar-sdk/node';
 import {loadDemoSseConfig} from '../config/demoSse';
-import {CHAT_SLAYER_CLIENT_ID_HEADER} from '../config/allowedClients';
+import {
+  CHAT_SLAYER_CLIENT_ID_HEADER,
+  findAllowedClientById,
+  getAllowedClientsConfig,
+} from '../config/allowedClients';
+import {SERVER_FINGERPRINT_CONFIG} from '../constants/runtime';
+import {
+  disableClient,
+  isClientDisabled,
+} from '../security/DisabledClientsRegistry';
+import {isValidSha256Hex, normalizeSha256Hex} from '../config/serverFingerprint';
 import {MatrixServerService} from '../fi/cs/matrix/server/MatrixServerService';
 import {MatrixVisibility} from '../fi/cs/matrix/types/request/createRoom/types/MatrixVisibility';
 import {createMatrixTextMessageDTO} from '../fi/cs/matrix/types/message/textMessage/MatrixTextMessageDTO';
@@ -76,6 +86,123 @@ function getHeader(req: IncomingMessage, name: string): string | undefined {
 
 function requireClientId(req: IncomingMessage): string | undefined {
   return getHeader(req, CHAT_SLAYER_CLIENT_ID_HEADER)?.trim();
+}
+
+async function readJsonBody(req: IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  }
+  const raw = Buffer.concat(chunks).toString('utf8').trim();
+  if (!raw) {
+    return {};
+  }
+  return JSON.parse(raw);
+}
+
+function respondClientDisabled(
+  res: ServerResponse,
+  clientId: string,
+): void {
+  res.statusCode = 403;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(
+    JSON.stringify(
+      {
+        error: `Client "${clientId}" is disabled due to a TLS fingerprint security alert`,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+async function handleReportTlsPinFailure(
+  req: IncomingMessage,
+  res: ServerResponse,
+  clientId: string,
+): Promise<void> {
+  const allowed = findAllowedClientById(
+    getAllowedClientsConfig().clients,
+    clientId,
+  );
+  if (!allowed) {
+    res.statusCode = 403;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({error: 'Unknown client id'}, null, 2));
+    return;
+  }
+
+  let body: unknown;
+  try {
+    body = await readJsonBody(req);
+  } catch {
+    res.statusCode = 400;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({error: 'Invalid JSON body'}, null, 2));
+    return;
+  }
+
+  const record = body as Record<string, unknown>;
+  const observedRaw =
+    typeof record.observedFingerprint === 'string'
+      ? record.observedFingerprint
+      : '';
+  const expectedRaw =
+    typeof record.expectedFingerprint === 'string'
+      ? record.expectedFingerprint
+      : '';
+
+  if (!isValidSha256Hex(observedRaw) || !isValidSha256Hex(expectedRaw)) {
+    res.statusCode = 400;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(
+      JSON.stringify(
+        {error: 'observedFingerprint and expectedFingerprint must be SHA-256 hex'},
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  const observedFingerprint = normalizeSha256Hex(observedRaw)!;
+  const expectedFingerprint = normalizeSha256Hex(expectedRaw)!;
+  const source =
+    record.source === 'header' || record.source === 'well-known'
+      ? record.source
+      : 'well-known';
+
+  const reason =
+    `TLS fingerprint mismatch reported by client (source=${source})`;
+
+  if (SERVER_FINGERPRINT_CONFIG.autoDisableOnPinFailure) {
+    disableClient({
+      clientId,
+      reason,
+      observedFingerprint,
+      expectedFingerprint,
+    });
+  } else {
+    console.error(
+      `[SECURITY] TLS pin failure for client "${clientId}" (auto-disable off): ` +
+        `observed=${observedFingerprint} expected=${expectedFingerprint}`,
+    );
+  }
+
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(
+    JSON.stringify(
+      {
+        disabled: SERVER_FINGERPRINT_CONFIG.autoDisableOnPinFailure,
+        message:
+          'TLS fingerprint mismatch recorded. This client id is disabled until server restart.',
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 function readPageHtml(): string | undefined {
@@ -523,6 +650,21 @@ export async function tryHandleDemoRequest(
     res.end(
       JSON.stringify({error: `Missing ${CHAT_SLAYER_CLIENT_ID_HEADER}`}),
     );
+    return true;
+  }
+
+  const clientId = requireClientId(req)!;
+
+  if (
+    path === '/demo/actions/report-tls-pin-failure' &&
+    method === 'POST'
+  ) {
+    await handleReportTlsPinFailure(req, res, clientId);
+    return true;
+  }
+
+  if (isClientDisabled(clientId)) {
+    respondClientDisabled(res, clientId);
     return true;
   }
 

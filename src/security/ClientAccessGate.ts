@@ -11,6 +11,8 @@ import {
   isDemoStaticPath,
   isHealthCheckPath,
 } from '../demo/serveDemoStatic';
+import {isWellKnownChatSlayerPath} from './wellKnownChatSlayer';
+import {isClientDisabled} from './DisabledClientsRegistry';
 import {
   applyCorsHeaders,
   setCorsAllowOrigin,
@@ -37,6 +39,14 @@ function isHealthCheckRequest(req: IncomingMessage): boolean {
   const method = req.method?.toUpperCase();
   const path = getRequestPath(req);
   return method === 'GET' && isHealthCheckPath(path);
+}
+
+function isWellKnownPublicRequest(req: IncomingMessage): boolean {
+  const method = req.method?.toUpperCase();
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    return false;
+  }
+  return isWellKnownChatSlayerPath(getRequestPath(req));
 }
 
 function isDemoPublicRequest(req: IncomingMessage): boolean {
@@ -80,6 +90,11 @@ export function evaluateClientAccess(
     return {allowed: true, corsOrigin: origin};
   }
 
+  if (isWellKnownPublicRequest(req)) {
+    const origin = resolveRequestOrigin(req);
+    return {allowed: true, corsOrigin: origin};
+  }
+
   if (!config.enforced) {
     const origin = resolveRequestOrigin(req);
     return {allowed: true, corsOrigin: origin};
@@ -93,6 +108,15 @@ export function evaluateClientAccess(
   }
 
   const clientId = getHeader(req, CHAT_SLAYER_CLIENT_ID_HEADER)?.trim();
+  if (isClientDisabled(clientId)) {
+    return {
+      allowed: false,
+      reason: clientId
+        ? `Client "${clientId}" is disabled due to a TLS fingerprint security alert`
+        : 'Client is disabled due to a TLS fingerprint security alert',
+      clientId,
+    };
+  }
   const client = findAllowedClientById(config.clients, clientId);
   if (!client) {
     return {

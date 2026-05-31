@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import type {IncomingMessage, ServerResponse} from 'http';
 import {injectDemoPageMeta} from './demoPageMeta';
 import {buildDemoConfigJson} from './demoClientConfig';
+import {buildWellKnownChatSlayerJson, WELL_KNOWN_CHAT_SLAYER_PATH} from '../security/wellKnownChatSlayer';
 
 export {buildDemoConfigJson, buildDemoClientConfig} from './demoClientConfig';
 
@@ -66,6 +67,7 @@ export function isDemoStaticPath(path: string): boolean {
   return (
     path.startsWith('/assets/') ||
     path === '/e2ee.mjs' ||
+    path === '/fingerprint.mjs' ||
     path === '/private-rooms.mjs' ||
     path === '/room-picker.mjs' ||
     path.startsWith('/crypto-sdk/')
@@ -127,6 +129,28 @@ export function tryServeHealth(req: IncomingMessage, res: ServerResponse): boole
     return false;
   }
   writeJson(res, JSON.stringify({status: 'ok'}, null, 2));
+  return true;
+}
+
+export function tryServeWellKnown(
+  req: IncomingMessage,
+  res: ServerResponse,
+): boolean {
+  const method = req.method?.toUpperCase();
+  if (method !== 'GET' && method !== 'HEAD') {
+    return false;
+  }
+  if (getRequestPath(req) !== WELL_KNOWN_CHAT_SLAYER_PATH) {
+    return false;
+  }
+  if (method === 'HEAD') {
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end();
+    return true;
+  }
+  writeJson(res, buildWellKnownChatSlayerJson());
   return true;
 }
 

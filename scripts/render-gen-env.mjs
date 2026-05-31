@@ -3,7 +3,8 @@
  * Generate Render Dashboard environment variables (colored terminal guide + optional .env.render).
  * No npm dependencies — inline ANSI only (no chalk).
  */
-import {randomBytes} from 'node:crypto';
+import {randomBytes, createHash, X509Certificate} from 'node:crypto';
+import {connect} from 'node:tls';
 import {writeFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -110,6 +111,7 @@ Examples:
   npm run render:gen:env
   npm run render:gen:env -- --write
   npm run render:gen:env -- --service my-app --seed alice:devpass123
+  npm run render:gen:env -- --url https://my-app.onrender.com   # phase 2: TLS pin after first deploy
 `);
 }
 
@@ -152,14 +154,18 @@ function generateJwtSecret() {
   return randomBytes(36).toString('base64');
 }
 
-function buildAllowedClientsJson(publicUrl) {
+function buildAllowedClientsJson(publicUrl, tlsFingerprintSha256) {
+  const webDemo = {
+    id: 'web-demo',
+    label: 'Web demo',
+    origins: [publicUrl],
+    allowWithoutOrigin: false,
+  };
+  if (tlsFingerprintSha256) {
+    webDemo.expectedTlsFingerprintSha256 = tlsFingerprintSha256;
+  }
   const clients = [
-    {
-      id: 'web-demo',
-      label: 'Web demo',
-      origins: [publicUrl],
-      allowWithoutOrigin: false,
-    },
+    webDemo,
     {
       id: 'ops-cli',
       label: 'CLI',
@@ -172,22 +178,68 @@ function buildAllowedClientsJson(publicUrl) {
   return json;
 }
 
-function buildEnvBundle(host) {
+function computeSpkiSha256FromRawCert(raw) {
+  const cert = new X509Certificate(raw);
+  const spkiDer = cert.publicKey.export({type: 'spki', format: 'der'});
+  return createHash('sha256').update(spkiDer).digest('hex');
+}
+
+function probeTlsSpkiSha256(publicUrl) {
+  const url = new URL(publicUrl);
+  const host = url.hostname;
+  const port = url.port ? parseInt(url.port, 10) : 443;
+  return new Promise((resolve, reject) => {
+    const socket = connect(
+      {host, port, servername: host, rejectUnauthorized: true},
+      () => {
+        const peer = socket.getPeerCertificate();
+        socket.end();
+        if (!peer?.raw) {
+          reject(new Error('No peer certificate'));
+          return;
+        }
+        try {
+          resolve(computeSpkiSha256FromRawCert(peer.raw));
+        } catch (err) {
+          reject(err);
+        }
+      },
+    );
+    socket.on('error', reject);
+  });
+}
+
+function opensslFingerprintCommand(hostname) {
+  return (
+    `openssl s_client -connect ${hostname}:443 -servername ${hostname} </dev/null 2>/dev/null \\\n` +
+    '  | openssl x509 -pubkey -noout \\\n' +
+    '  | openssl pkey -pubin -outform der \\\n' +
+    '  | openssl dgst -sha256'
+  );
+}
+
+function buildEnvBundle(host, tlsFingerprintSha256) {
   const jwt = generateJwtSecret();
-  const allowedClients = buildAllowedClientsJson(host.publicUrl);
+  const allowedClients = buildAllowedClientsJson(host.publicUrl, tlsFingerprintSha256);
   const plain = {
     BACKEND_PUBLIC_URL: host.publicUrl,
     BACKEND_HOSTNAME: host.hostname,
     CLIENT_ACCESS_ENFORCED: 'true',
     ALLOWED_CLIENTS: allowedClients,
   };
+  if (tlsFingerprintSha256) {
+    plain.BACKEND_TLS_FINGERPRINT_SHA256 = tlsFingerprintSha256;
+    plain.BACKEND_TLS_PIN_ENFORCED = 'true';
+  } else {
+    plain.BACKEND_TLS_PIN_ENFORCED = 'false';
+  }
   const secrets = {
     BACKEND_JWT_SECRET: jwt,
   };
   if (host.seed) {
     secrets.BACKEND_INITIAL_USERS = host.seed;
   }
-  return {plain, secrets, jwt, allowedClients};
+  return {plain, secrets, jwt, allowedClients, tlsFingerprintSha256};
 }
 
 function buildDotEnvLines(plain, secrets) {
@@ -269,6 +321,24 @@ function printDashboardGuide(host, bundle, useColor) {
     `   Public URL for this run: ${host.publicUrl}`,
     useColor,
   );
+  if (bundle.tlsFingerprintSha256) {
+    println(
+      'green',
+      '   TLS phase 2: live probe OK — Section B includes BACKEND_TLS_FINGERPRINT_SHA256 + pin in ALLOWED_CLIENTS.',
+      useColor,
+    );
+  } else {
+    println(
+      'yellow',
+      '   TLS phase 1: no live pin (service not reachable yet). Set BACKEND_TLS_PIN_ENFORCED=false for first deploy.',
+      useColor,
+    );
+    println(
+      'yellow',
+      '   After HTTPS is live, re-run: npm run render:gen:env -- --url https://<your-service>.onrender.com',
+      useColor,
+    );
+  }
   console.log('');
 
   divider('-', 80, useColor);
@@ -415,9 +485,78 @@ function printDashboardGuide(host, bundle, useColor) {
   );
   console.log('');
 
+  divider('-', 80, useColor);
+  println(
+    'bold yellow',
+    'SECTION G — Fingerprint hash verification (GRC-style MITM defense)',
+    useColor,
+  );
+  divider('-', 80, useColor);
+  println(
+    'dim',
+    '  Three layers: (1) server startup probe vs BACKEND_TLS_FINGERPRINT_SHA256',
+    useColor,
+  );
+  println(
+    'dim',
+    '  (2) browser demo compares /.well-known/chat-slayer.json vs expectedTlsFingerprintSha256',
+    useColor,
+  );
+  println(
+    'dim',
+    '  (3) operator gold-standard below vs Dashboard + live endpoint',
+    useColor,
+  );
+  println(
+    'cyan',
+    '  Independent check: https://www.grc.com/fingerprints.htm',
+    useColor,
+  );
+  println(
+    'dim',
+    '  SPKI SHA-256 hash (64 hex; survives leaf cert renewal when key is reused).',
+    useColor,
+  );
+  println('bold white', '  Operator verification (OpenSSL):', useColor);
+  printPlainValue(opensslFingerprintCommand(host.hostname));
+  console.log('');
+  println('bold white', '  After deploy, confirm live hash matches Dashboard:', useColor);
+  printPlainValue(
+    `curl -s ${host.publicUrl}/.well-known/chat-slayer.json`,
+  );
+  printPlainValue(
+    `curl -sI ${host.publicUrl}/health | grep -i x-chat-slayer-tls-fingerprint`,
+  );
+  console.log('');
+  if (bundle.tlsFingerprintSha256) {
+    println(
+      'green',
+      `  Live probe succeeded — BACKEND_TLS_FINGERPRINT_SHA256=${bundle.tlsFingerprintSha256}`,
+      useColor,
+    );
+    println(
+      'dim',
+      '  Included in Section B plain vars and web-demo expectedTlsFingerprintSha256 in ALLOWED_CLIENTS.',
+      useColor,
+    );
+  } else {
+    println(
+      'yellow',
+      '  Live probe skipped or failed — run the OpenSSL command after first deploy, then set:',
+      useColor,
+    );
+    println('yellow', '    BACKEND_TLS_FINGERPRINT_SHA256=<64 hex chars>', useColor);
+    println(
+      'yellow',
+      '    expectedTlsFingerprintSha256 on web-demo in ALLOWED_CLIENTS (same value)',
+      useColor,
+    );
+  }
+  console.log('');
+
   println(
     'green',
-    'Done. See RENDER_DEPLOYMENT.md. Rotate BACKEND_JWT_SECRET if it was ever committed.',
+    'Done. See RENDER_DEPLOYMENT.md § Fingerprint hash verification. Rotate BACKEND_JWT_SECRET if it was ever committed.',
     useColor,
   );
 }
@@ -447,7 +586,13 @@ function main() {
   }
   const useColor = supportsColor(opts.noColor);
   const host = resolveHost(opts);
-  const bundle = buildEnvBundle({...host, seed: opts.seed});
+  let tlsFingerprintSha256;
+  try {
+    tlsFingerprintSha256 = await probeTlsSpkiSha256(host.publicUrl);
+  } catch {
+    tlsFingerprintSha256 = undefined;
+  }
+  const bundle = buildEnvBundle({...host, seed: opts.seed}, tlsFingerprintSha256);
 
   printDashboardGuide(host, bundle, useColor);
 
@@ -464,7 +609,7 @@ function main() {
 }
 
 try {
-  main();
+  await main();
 } catch (err) {
   console.error(err instanceof Error ? err.message : err);
   process.exit(1);

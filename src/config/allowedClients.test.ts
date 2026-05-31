@@ -20,12 +20,14 @@ function testNormalizeOrigin(): void {
 }
 
 function testParseAllowedClientsJson(): void {
+  const pin = 'a'.repeat(64);
   const clients = parseAllowedClientsJson(
     JSON.stringify([
       {
         id: 'web-demo',
         origins: ['http://localhost:5173/'],
         allowWithoutOrigin: false,
+        expectedTlsFingerprintSha256: pin,
       },
       {
         id: 'ops-cli',
@@ -35,8 +37,16 @@ function testParseAllowedClientsJson(): void {
   );
   assert.equal(clients.length, 2);
   assert.equal(clients[0].origins[0], 'http://localhost:5173');
+  assert.equal(clients[0].expectedTlsFingerprintSha256, pin);
   assert.throws(() => parseAllowedClientsJson('not-json'), /valid JSON/);
   assert.throws(() => parseAllowedClientsJson('{"id":"dup"}'), /array/);
+  assert.throws(
+    () =>
+      parseAllowedClientsJson(
+        '[{"id":"x","expectedTlsFingerprintSha256":"bad"}]',
+      ),
+    /64 hex/,
+  );
 }
 
 function testFormatAllowedClientsLogLines(): void {

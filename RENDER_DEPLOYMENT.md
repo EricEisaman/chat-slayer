@@ -18,9 +18,110 @@ This guide matches the repo’s [render.yaml](render.yaml) blueprint and how the
 1. Push this repository to GitHub/GitLab.
 2. In [Render](https://render.com) → **New** → **Blueprint** → connect the repo (uses `render.yaml`).
 3. After the service is created, open **Environment** and add the variables in [Required Dashboard configuration](#required-dashboard-configuration) below.
-4. Deploy. Build runs: `BUILD_NODE_ENV=production npm ci --include=dev && npm run build`. Start runs: `node dist/chat-slayer.cjs`.
+4. **First deploy:** include `BACKEND_TLS_PIN_ENFORCED=false` (see [Two-phase deploy checklist](#two-phase-deploy-checklist-tls-fingerprint)). You cannot generate the TLS pin until HTTPS is live.
+5. Deploy. Build runs: `BUILD_NODE_ENV=production npm ci --include=dev && npm run build`. Start runs: `node dist/chat-slayer.cjs`.
+6. **Second deploy:** after the service is Live, run `npm run render:gen:env -- --url https://<your-service>.onrender.com`, paste the TLS pin vars from Sections **B** and **G**, set `BACKEND_TLS_PIN_ENFORCED=true`, Save → redeploy.
 
 Manual deploy (without Blueprint) is fine: create a **Web Service**, runtime **Node**, same build/start commands, same env rules.
+
+## Two-phase deploy checklist (TLS fingerprint)
+
+Production **defaults** to TLS pin enforcement (`BACKEND_TLS_PIN_ENFORCED=true`). Without `BACKEND_TLS_FINGERPRINT_SHA256`, the process **exits on startup**. Because the pin comes from your live HTTPS certificate, use two phases:
+
+| Phase | When | Dashboard env (minimum) |
+|-------|------|-------------------------|
+| **1 — First deploy** | Service does not exist yet (or HTTPS not reachable) | `BACKEND_JWT_SECRET`, `BACKEND_PUBLIC_URL`, `BACKEND_HOSTNAME`, `ALLOWED_CLIENTS`, **`BACKEND_TLS_PIN_ENFORCED=false`** |
+| **2 — Enable pinning** | After `GET /health` succeeds on your public URL | Run `npm run render:gen:env -- --url https://<your-service>.onrender.com`. Add **`BACKEND_TLS_FINGERPRINT_SHA256`**, update **`ALLOWED_CLIENTS`** (`expectedTlsFingerprintSha256` on `web-demo`), set **`BACKEND_TLS_PIN_ENFORCED=true`**, redeploy |
+
+**Generate pin (phase 2):**
+
+```bash
+npm run render:deploy:test          # preflight build (before every push)
+npm run render:gen:env -- --url https://your-service.onrender.com
+```
+
+When the live TLS probe succeeds, **Section B** auto-includes `BACKEND_TLS_FINGERPRINT_SHA256`, `BACKEND_TLS_PIN_ENFORCED=true`, and `expectedTlsFingerprintSha256` inside `ALLOWED_CLIENTS`. **Section G** always prints the OpenSSL command and [GRC fingerprints](https://www.grc.com/fingerprints.htm) link for independent verification.
+
+**First-deploy `ALLOWED_CLIENTS` example (no pin yet):**
+
+```json
+[
+  {
+    "id": "web-demo",
+    "label": "Web demo",
+    "origins": ["https://your-service.onrender.com"],
+    "allowWithoutOrigin": false
+  },
+  {
+    "id": "ops-cli",
+    "label": "CLI",
+    "origins": [],
+    "allowWithoutOrigin": true
+  }
+]
+```
+
+After phase 2, the same `web-demo` entry should include `"expectedTlsFingerprintSha256": "<64 hex SPKI SHA-256>"` matching `BACKEND_TLS_FINGERPRINT_SHA256`.
+
+## Fingerprint hash verification
+
+Chat Slayer uses a **TLS SPKI SHA-256** hash (64 lowercase hex characters) — not the whole-certificate fingerprint — so the pin survives leaf cert renewal when the key is reused ([GRC-style](https://www.grc.com/fingerprints.htm)).
+
+Verification runs at **three layers**. All three must agree on the same hash when pinning is enabled:
+
+| Layer | When | What is checked | On mismatch |
+|-------|------|-----------------|-------------|
+| **Server (startup)** | Every boot | Live TLS probe to `BACKEND_PUBLIC_URL` vs `BACKEND_TLS_FINGERPRINT_SHA256` (and optional backup pin) | Process **exits** — deploy blocked |
+| **Client (browser demo)** | First page load | `GET /.well-known/chat-slayer.json` + header `X-Chat-Slayer-TLS-Fingerprint-SHA256` vs `expectedTlsFingerprintSha256` in `ALLOWED_CLIENTS` / `__CS_DEMO_CONFIG__` | User **alert**, UI **blocked**, `POST /demo/actions/report-tls-pin-failure`, client id **disabled** |
+| **Operator (manual)** | After phase 2 deploy | Gold-standard pin from [GRC fingerprints](https://www.grc.com/fingerprints.htm) or OpenSSL vs Dashboard + live endpoint | Fix env / investigate MITM before enabling clients |
+
+### Server startup verification
+
+On boot the server:
+
+1. Connects to `BACKEND_PUBLIC_URL` over TLS and computes the live **SPKI SHA-256**.
+2. Compares it to `BACKEND_TLS_FINGERPRINT_SHA256` (accepts `BACKEND_TLS_FINGERPRINT_BACKUP_SHA256` during rotation).
+3. Logs `TLS SPKI SHA-256 fingerprint: <hash>` on success.
+4. **Fail-fast exits** if pin enforcement is on and the configured pin does not match the live certificate.
+
+### Client verification (browser demo)
+
+When `BACKEND_TLS_PIN_ENFORCED=true` and `expectedTlsFingerprintSha256` is set, [`demo/fingerprint.mjs`](demo/fingerprint.mjs) runs before login:
+
+1. Fetches `/.well-known/chat-slayer.json` (also reads response header `X-Chat-Slayer-TLS-Fingerprint-SHA256`).
+2. Compares the observed hash to the **gold-standard** expected pin from Dashboard `ALLOWED_CLIENTS` (not from the page alone).
+3. Optional **trust-on-first-use**: stores the first seen pin in `localStorage`; alerts if the server pin changes on a later visit.
+4. On mismatch: browser alert, API calls blocked, security report sent, `web-demo` disabled server-side until restart.
+
+Full client details: [CLIENT_GUIDE.md — TLS fingerprint pinning](CLIENT_GUIDE.md#tls-fingerprint-pinning-grc-style).
+
+### Operator verification (run after phase 2)
+
+Confirm the live service matches your Dashboard pin:
+
+```bash
+# 1. Well-known document (what clients read)
+curl -s https://<your-service>.onrender.com/.well-known/chat-slayer.json
+
+# 2. Response header (same hash)
+curl -sI https://<your-service>.onrender.com/health | grep -i x-chat-slayer-tls-fingerprint
+
+# 3. Independent gold-standard (compare to BACKEND_TLS_FINGERPRINT_SHA256)
+openssl s_client -connect <your-service>.onrender.com:443 -servername <your-service>.onrender.com </dev/null 2>/dev/null \
+  | openssl x509 -pubkey -noout \
+  | openssl pkey -pubin -outform der \
+  | openssl dgst -sha256
+```
+
+Also verify at [https://www.grc.com/fingerprints.htm](https://www.grc.com/fingerprints.htm) from a trusted network. All three sources should show the **same 64-character hex hash**.
+
+### What gets published
+
+| Source | Field / header |
+|--------|----------------|
+| `GET /.well-known/chat-slayer.json` | `tlsFingerprintSha256`, `tlsFingerprintBackupSha256`, `pinEnforced` |
+| Every HTTP response | Header `X-Chat-Slayer-TLS-Fingerprint-SHA256` |
+| Demo inline config | `window.__CS_DEMO_CONFIG__.expectedTlsFingerprintSha256` |
 
 ## Required Dashboard configuration
 
@@ -43,6 +144,10 @@ Set these in **Environment** for the web service. Use **Secret** for sensitive v
 | `BACKEND_LOG_LEVEL` | No | Optional | Blueprint sets `INFO`. Use `DEBUG` only while troubleshooting. |
 | `ALLOWED_CLIENTS` | No | **Yes** (production) | JSON array of allowed client ids and browser origins. Required when client access is enforced (default in production). See [CLIENT_GUIDE.md](CLIENT_GUIDE.md). |
 | `CLIENT_ACCESS_ENFORCED` | No | Optional | Default `true` in production. Set `false` only if you intentionally disable the client gate. |
+| `BACKEND_TLS_FINGERPRINT_SHA256` | No | **Phase 2** (required when pin enforced) | TLS **SPKI SHA-256** pin (64 hex). Server probes `BACKEND_PUBLIC_URL` at startup and publishes via `/.well-known/chat-slayer.json`. Generate after first deploy — see [Two-phase deploy checklist](#two-phase-deploy-checklist-tls-fingerprint). |
+| `BACKEND_TLS_FINGERPRINT_BACKUP_SHA256` | No | Optional | Backup pin for certificate rotation overlap. |
+| `BACKEND_TLS_PIN_ENFORCED` | No | **Phase 1: set `false`** | Default `true` in production if unset. **First deploy:** set `false` until pin is configured. **Phase 2:** set `true` after `BACKEND_TLS_FINGERPRINT_SHA256` and `expectedTlsFingerprintSha256` are set. |
+| `BACKEND_AUTO_DISABLE_ON_PIN_FAILURE` | No | Optional | Default `true` in production. When a client reports a pin mismatch, that client id is disabled in-memory until restart. |
 
 ### Do not set on Render (unless you know why)
 
@@ -73,9 +178,24 @@ Set these in **Environment** for the web service. Use **Secret** for sensitive v
 5. **Placeholder blocklist** — Values like `change-me-in-render-dashboard` from [.env.example](.env.example) are rejected in production (example file is for local dev only).
 6. **Repo scanning** — [.github/workflows/gitleaks.yml](.github/workflows/gitleaks.yml) runs on push/PR to catch accidental secret commits.
 
+### TLS fingerprint pinning (GRC-style)
+
+See **[Fingerprint hash verification](#fingerprint-hash-verification)** for how server, client, and operator checks work.
+
+Render terminates TLS at the edge; the Node process probes your public HTTPS URL at startup and compares the live **SPKI SHA-256** to `BACKEND_TLS_FINGERPRINT_SHA256`. Clients validate the published pin on first request; a mismatch triggers a security alert and disables that client id until restart.
+
+Follow the [two-phase deploy checklist](#two-phase-deploy-checklist-tls-fingerprint) above. Summary:
+
+1. **Phase 1** — deploy with `BACKEND_TLS_PIN_ENFORCED=false`.
+2. **Phase 2** — `npm run render:gen:env -- --url https://<your-service>.onrender.com`; paste pin into Dashboard; redeploy with `BACKEND_TLS_PIN_ENFORCED=true`.
+3. Verify independently via [GRC fingerprints](https://www.grc.com/fingerprints.htm) (gold-standard out-of-band check).
+4. For certificate rotation, set `BACKEND_TLS_FINGERPRINT_BACKUP_SHA256` before rotating, then swap primary/backup after cutover.
+
+Local dev (`http://localhost`) skips pin enforcement by default.
+
 ### Generate Dashboard env vars (recommended)
 
-From the repo root, run the local generator. It prints **colored sections A–F** that map to the Render UI (which vars to skip, which need **Secret** on, and what to copy into each field):
+From the repo root, run the local generator. It prints **colored sections A–G** that map to the Render UI (which vars to skip, which need **Secret** on, and what to copy into each field):
 
 ```bash
 npm run render:gen:env
@@ -90,6 +210,7 @@ npm run render:gen:env -- --write   # also writes plain .env.render for "Add fro
 | **D** | **Add from .env** — paste `--- BEGIN .env ---` block |
 | **E** | Do not set (`PORT`, etc.) |
 | **F** | Manual (`BACKEND_EMAIL_CONFIG` if needed) |
+| **G** | **Fingerprint hash verification** — OpenSSL + [GRC fingerprints](https://www.grc.com/fingerprints.htm); see [RENDER_DEPLOYMENT.md § Fingerprint hash verification](RENDER_DEPLOYMENT.md#fingerprint-hash-verification) |
 
 Options: `--service <slug>`, `--url https://…`, `--seed user:pass`, `--no-color`. Values to paste are printed on **plain lines** (no ANSI) for easy copy.
 
@@ -118,10 +239,19 @@ npm run render:deploy:test
 
 This mirrors Render’s **Node 22.12 / npm 10.9** install and [render.yaml](render.yaml) production build: lockfile `npm ci`, `BUILD_NODE_ENV=production npm run build`, artifact checks, and Dockerfile runner `npm ci --omit=dev`. Use `--clean` for a cold install, `--docker` to also run `docker build`.
 
-Then generate Dashboard secrets if needed:
+**TLS fingerprint (after first Live deploy):**
+
+```bash
+npm run render:gen:env -- --url https://<your-service>.onrender.com
+```
+
+Paste Sections **B** + **C** (and **G** if the live probe failed). See [Two-phase deploy checklist](#two-phase-deploy-checklist-tls-fingerprint).
+
+For a brand-new service (no HTTPS yet), generate JWT + clients only:
 
 ```bash
 npm run render:gen:env
+# Use Section B/C; set BACKEND_TLS_PIN_ENFORCED=false manually for phase 1
 ```
 
 Optional quality gates:
@@ -149,11 +279,12 @@ See [STYLEGUIDE.md](STYLEGUIDE.md) and [README.md](README.md) for the Google Typ
 
 ## Verify after deploy
 
-1. **Logs** — No `BACKEND_JWT_SECRET must be...` or `BACKEND_PUBLIC_URL must be...` errors; expect `Started at http://0.0.0.0:<PORT>`.
+1. **Logs** — No `BACKEND_JWT_SECRET must be...` or `BACKEND_PUBLIC_URL must be...` errors; expect `Started at http://0.0.0.0:<PORT>`. After phase 2, expect `TLS SPKI SHA-256 fingerprint: <64 hex>`.
 2. **Health** — `curl -s https://<your-service>.onrender.com/health` → `{"status":"ok"}`.
-3. **Demo** — open `https://<your-service>.onrender.com/` in a browser (built-in client; uses `web-demo` + same origin).
-4. **Matrix discovery** — `curl -s https://<your-service>.onrender.com/_matrix/client/r0/login` (or your login route) should not reference `localhost`.
-5. **Secrets** — Confirm Dashboard variables are marked **Secret** where applicable; rotate `BACKEND_JWT_SECRET` if it was ever committed.
+3. **TLS fingerprint verification** — `curl -s https://<your-service>.onrender.com/.well-known/chat-slayer.json` → `tlsFingerprintSha256` matches Dashboard `BACKEND_TLS_FINGERPRINT_SHA256` and [operator OpenSSL/GRC check](#operator-verification-run-after-phase-2).
+4. **Demo** — open `https://<your-service>.onrender.com/` in a browser (built-in client; uses `web-demo` + same origin). No TLS alert on load = client verification passed.
+5. **Matrix discovery** — `curl -s https://<your-service>.onrender.com/_matrix/client/r0/login` (or your login route) should not reference `localhost`.
+6. **Secrets** — Confirm Dashboard variables are marked **Secret** where applicable; rotate `BACKEND_JWT_SECRET` if it was ever committed.
 
 ## Local production-like test (before Render)
 
@@ -182,6 +313,8 @@ curl -s http://127.0.0.1:10000/
 | `Missing: @emnapi/core from lock file` | Lockfile generated with npm 11+ only | `rm -rf node_modules && npx -y npm@10.9.0 install`, commit lockfile, rerun `render:deploy:test`. |
 | Build fails: `vite: not found` | Dev deps skipped | Use `npm ci --include=dev` in build (already in blueprint). |
 | Immediate exit on start | Missing/weak `BACKEND_JWT_SECRET` or bad `BACKEND_PUBLIC_URL` | Set Secret JWT (32+ chars) and HTTPS public URL in Dashboard. |
+| Immediate exit: `BACKEND_TLS_FINGERPRINT_SHA256 is required` | Pin enforcement on before pin configured | **Phase 1:** set `BACKEND_TLS_PIN_ENFORCED=false`, deploy. **Phase 2:** run `render:gen:env -- --url https://…`, add pin, set enforcement `true`. |
+| Exit: configured pin does not match live SPKI | Stale/wrong pin in Dashboard | Re-run `npm run render:gen:env -- --url https://…`; update `BACKEND_TLS_FINGERPRINT_SHA256` and `expectedTlsFingerprintSha256`. |
 | Health check failed | App not binding to `PORT` | Remove custom `PORT` / `BACKEND_URL` overrides; redeploy. |
 | Matrix clients see `localhost` | `BACKEND_PUBLIC_URL` / `BACKEND_HOSTNAME` unset | Set both to your `*.onrender.com` host. |
 | Users gone after deploy | Ephemeral memory | Expected on free tier; use `BACKEND_INITIAL_USERS` or external store (not in this guide). |
@@ -196,7 +329,8 @@ Production enforces the client gate by default. The **built-in demo UI** is serv
   {
     "id": "web-demo",
     "origins": ["https://your-service.onrender.com"],
-    "allowWithoutOrigin": false
+    "allowWithoutOrigin": false,
+    "expectedTlsFingerprintSha256": "<64 hex — add in phase 2 via render:gen:env>"
   },
   {
     "id": "ops-cli",

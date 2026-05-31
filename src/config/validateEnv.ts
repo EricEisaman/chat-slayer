@@ -1,5 +1,9 @@
 import {parseAllowedClientsJson} from './allowedClients';
 import {isDeployProduction} from './deployMode';
+import {
+  isLocalDevPublicUrl,
+  loadServerFingerprintConfig,
+} from './serverFingerprint';
 import {INSECURE_JWT_PLACEHOLDERS, resolveBackendJwtSecret} from './secrets';
 import {
   BACKEND_PUBLIC_URL,
@@ -36,6 +40,20 @@ export function validateProductionEnv(): void {
     console.error(
       'BACKEND_PUBLIC_URL must be your public Render HTTPS URL when NODE_ENV=production ' +
         '(e.g. https://chat-slayer.onrender.com). Set it in the Render Dashboard.',
+    );
+    process.exit(1);
+  }
+
+  const fingerprintConfig = loadServerFingerprintConfig(publicUrl);
+  if (
+    fingerprintConfig.pinEnforced &&
+    !isLocalDevPublicUrl(publicUrl) &&
+    !fingerprintConfig.primaryPin
+  ) {
+    console.error(
+      'BACKEND_TLS_FINGERPRINT_SHA256 is required when BACKEND_TLS_PIN_ENFORCED is true in production.\n' +
+        'Obtain the SPKI SHA-256 pin via openssl or https://www.grc.com/fingerprints.htm\n' +
+        'Set BACKEND_TLS_PIN_ENFORCED=false only during initial rollout.',
     );
     process.exit(1);
   }

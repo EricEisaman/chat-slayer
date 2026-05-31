@@ -18,6 +18,7 @@ for (const file of [
   'index.html',
   'demo.css',
   'e2ee.mjs',
+  'fingerprint.mjs',
   'private-rooms.mjs',
   'room-picker.mjs',
 ]) {

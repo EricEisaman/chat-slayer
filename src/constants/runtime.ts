@@ -4,6 +4,10 @@ import {
 } from '../config/allowedClients';
 import {loadDemoSseConfig, type DemoSseConfig} from '../config/demoSse';
 import {loadRoomHistoryLimit} from '../config/roomHistory';
+import {
+  loadServerFingerprintConfig,
+  type ServerFingerprintConfig,
+} from '../config/serverFingerprint';
 import {resolveBackendJwtSecret} from '../config/secrets';
 import {parseNonEmptyString} from '../fi/cs/core/types/String';
 import {LogLevel, parseLogLevel} from '../fi/cs/core/types/LogLevel';
@@ -105,3 +109,6 @@ export const DEMO_SSE_CONFIG: DemoSseConfig = loadDemoSseConfig();
 
 /** Max recent messages per room on history fetch (demo join/switch, GET /messages). */
 export const BACKEND_ROOM_HISTORY_LIMIT: number = loadRoomHistoryLimit();
+
+export const SERVER_FINGERPRINT_CONFIG: ServerFingerprintConfig =
+  loadServerFingerprintConfig(BACKEND_PUBLIC_URL);
