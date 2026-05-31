@@ -6,7 +6,7 @@ Chat Slayer can restrict which applications may call Matrix client APIs. Each re
 X-Chat-Slayer-Client-Id: <your-client-id>
 ```
 
-Render health checks (`GET /health`), `GET /.well-known/chat-slayer.json`, and demo static assets (`GET /`, `/demo.css`, `/assets/*`, `/demo-config.json`, `/favicon.ico`, `/fingerprint.mjs`, `/e2ee.mjs`, `/crypto-sdk/*`) are exempt and do not need this header. Demo **API** routes (`GET /demo/stream`, `POST /demo/actions/*`) require `X-Chat-Slayer-Client-Id` when enforcement is on (same as Matrix APIs).
+Render health checks (`GET /health`, plus `OPTIONS`/`HEAD` on `/health` for browser preflight), `GET /.well-known/chat-slayer.json`, and demo static assets (`GET /`, `/demo.css`, `/assets/*`, `/demo-config.json`, `/favicon.ico`, `/fingerprint.mjs`, `/e2ee.mjs`, `/crypto-sdk/*`) are exempt and do not need this header. Demo **API** routes (`GET /demo/stream`, `POST /demo/actions/*`) require `X-Chat-Slayer-Client-Id` when enforcement is on (same as Matrix APIs).
 
 ## Environment variables
 
@@ -318,6 +318,7 @@ curl -s "http://localhost:8008/_matrix/client/r0/login" -X POST -H "Content-Type
 | Problem | Cause | Fix |
 |---------|--------|-----|
 | CORS error in browser | Origin not in `origins` for that `id` | Add exact origin (scheme + host + port). |
+| CORS error on `/health` only | Old server without health CORS | Redeploy chat-slayer; `/health` echoes `Origin` for CORS (no client id). |
 | `403 Client not allowed` | Missing/wrong `X-Chat-Slayer-Client-Id` | Match an `id` in `ALLOWED_CLIENTS`. |
 | `403` with Origin message | Browser origin not listed | Add origin to the client entry. |
 | Server exits on startup (production) | Empty/invalid `ALLOWED_CLIENTS` | Set valid JSON with ≥1 client. |
@@ -328,7 +329,7 @@ curl -s "http://localhost:8008/_matrix/client/r0/login" -X POST -H "Content-Type
 
 - JWT secrets and SMTP URLs stay in environment variables only (never in `ALLOWED_CLIENTS`).
 - A stolen access token still requires a valid client id (and origin for browser clients) on each request.
-- `GET /health` is public for load balancer health checks; `GET /` serves the demo UI.
+- `GET /health` is public for load balancer health checks (and reflects `Origin` for cross-origin game warmup); `GET /` serves the demo UI.
 
 ## Related docs
 

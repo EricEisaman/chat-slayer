@@ -42,6 +42,37 @@ function testHealthExempt(): void {
     sampleConfig,
   );
   assert.equal(d.allowed, true);
+  assert.equal(d.corsOrigin, undefined);
+}
+
+function testHealthCorsWithOrigin(): void {
+  const d = evaluateClientAccess(
+    mockReq({
+      method: 'GET',
+      url: '/health',
+      headers: {origin: 'https://bgs-mp.onrender.com'},
+    }),
+    sampleConfig,
+  );
+  assert.equal(d.allowed, true);
+  assert.equal(d.corsOrigin, 'https://bgs-mp.onrender.com');
+}
+
+function testHealthOptionsPreflight(): void {
+  const d = evaluateClientAccess(
+    mockReq({
+      method: 'OPTIONS',
+      url: '/health',
+      headers: {
+        origin: 'https://bgs-mp.onrender.com',
+        'access-control-request-method': 'GET',
+        'access-control-request-headers': 'x-chat-slayer-client-id',
+      },
+    }),
+    sampleConfig,
+  );
+  assert.equal(d.allowed, true);
+  assert.equal(d.corsOrigin, 'https://bgs-mp.onrender.com');
 }
 
 function testDemoStaticExempt(): void {
@@ -148,6 +179,8 @@ function testDisabledClientDenied(): void {
 
 resetAllowedClientsConfigCache();
 testHealthExempt();
+testHealthCorsWithOrigin();
+testHealthOptionsPreflight();
 testDemoStaticExempt();
 testDemoConfigJsonPublic();
 testWellKnownExempt();

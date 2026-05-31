@@ -35,10 +35,12 @@ function getRequestPath(req: IncomingMessage): string {
   return q >= 0 ? url.substring(0, q) : url;
 }
 
-function isHealthCheckRequest(req: IncomingMessage): boolean {
+function isHealthPublicRequest(req: IncomingMessage): boolean {
   const method = req.method?.toUpperCase();
-  const path = getRequestPath(req);
-  return method === 'GET' && isHealthCheckPath(path);
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    return false;
+  }
+  return isHealthCheckPath(getRequestPath(req));
 }
 
 function isWellKnownPublicRequest(req: IncomingMessage): boolean {
@@ -81,8 +83,9 @@ export function evaluateClientAccess(
   req: IncomingMessage,
   config: AllowedClientsConfig = getAllowedClientsConfig(),
 ): ClientAccessDecision {
-  if (isHealthCheckRequest(req)) {
-    return {allowed: true};
+  if (isHealthPublicRequest(req)) {
+    const origin = resolveRequestOrigin(req);
+    return {allowed: true, corsOrigin: origin};
   }
 
   if (isDemoPublicRequest(req)) {
