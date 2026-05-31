@@ -34,6 +34,7 @@ Set these in **Environment** for the web service. Use **Secret** for sensitive v
 | `BACKEND_INITIAL_USERS` | **Yes** | Optional | Seed users: `user:password` or `user:password;user2:pass2`. Passwords are secrets; only needed if you want users recreated after each deploy (ephemeral memory). Required if you use `BACKEND_INITIAL_ROOMS` (public boot-seed). |
 | `BACKEND_INITIAL_ROOMS` | No | Optional | Comma-separated **public** room display names. Boot-seeded at startup for the first seed user; visible to all users. |
 | `BACKEND_PRIVATE_ROOMS` | No | Optional | Comma-separated **private** room display names. Hidden until each user discovers the exact name. Never logged by name (count only). |
+| `BACKEND_ROOM_HISTORY_LIMIT` | No | Optional | Max recent messages per room on history fetch (default **20**). Demo join/switch and `GET /messages`. |
 | `BACKEND_EMAIL_CONFIG` | **Yes** (often) | Optional | SMTP URL, e.g. `smtps://user:pass@smtp.example.com:465`. May embed credentials — always use a Secret. Default `smtp://localhost:25` is not useful on Render unless you add SMTP elsewhere. |
 | `BACKEND_EMAIL_FROM` | No | Optional | From header, e.g. `Chat Slayer <noreply@yourdomain.com>`. |
 | `BACKEND_JWT_ALG` | No | Optional | Default `HS256`. |

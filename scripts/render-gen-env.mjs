@@ -408,6 +408,11 @@ function printDashboardGuide(host, bundle, useColor) {
     '  BACKEND_PRIVATE_ROOMS — optional private rooms (comma-separated); hidden until discovered.',
     useColor,
   );
+  println(
+    'dim',
+    '  BACKEND_ROOM_HISTORY_LIMIT — optional max recent messages per room (default 20).',
+    useColor,
+  );
   console.log('');
 
   println(

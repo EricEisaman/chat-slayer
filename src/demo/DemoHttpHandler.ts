@@ -32,6 +32,7 @@ import {
   readSendMessage,
 } from './demoActionInput';
 import {filterInboxForRoom} from './demoHtml';
+import {BACKEND_ROOM_HISTORY_LIMIT} from '../constants/runtime';
 import {listDemoRoomsForUser} from './demoRooms';
 import {applyCorsHeaders} from '../fi/cs/node/CorsResponseContext';
 import {
@@ -361,7 +362,7 @@ async function handleSend(
       hub.patchSubscriberUi(sub);
     }
     const filteredInbox = sub
-      ? filterInboxForRoom(sub.inboxLines, roomId)
+      ? filterInboxForRoom(sub.inboxLines, roomId, BACKEND_ROOM_HISTORY_LIMIT)
       : [];
     respondDemoActionSignals(
       req,

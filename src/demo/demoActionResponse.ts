@@ -1,6 +1,7 @@
 import type {IncomingMessage, ServerResponse} from 'http';
 import {ServerSentEventGenerator} from '@starfederation/datastar-sdk/node';
 import {chatSlayerSignalPatch} from './chatSlayerSignalPatch';
+import {BACKEND_ROOM_HISTORY_LIMIT} from '../constants/runtime';
 import type {MessageLine, RoomListEntry} from './demoHtml';
 import {patchDemoInboxUi, patchDemoRoomUi} from './demoRoomUiPatch';
 
@@ -29,7 +30,12 @@ export function respondDemoActionSignals(
     if (inbox) {
       const activeRoomId =
         typeof signalPatch.roomId === 'string' ? signalPatch.roomId : '';
-      patchDemoInboxUi(patch, inbox, activeRoomId);
+      patchDemoInboxUi(
+        patch,
+        inbox,
+        activeRoomId,
+        BACKEND_ROOM_HISTORY_LIMIT,
+      );
     }
   });
 }

@@ -1,5 +1,6 @@
 import type {MatrixServerService} from '../fi/cs/matrix/server/MatrixServerService';
 import type {StoredTimelineEvent} from '../fi/cs/matrix/server/roomTimeline';
+import {BACKEND_ROOM_HISTORY_LIMIT} from '../constants/runtime';
 import {
   buildLiveSnapshotSignalPatch,
   buildRoomDirectorySignalPatch,
@@ -38,6 +39,11 @@ export interface DemoSseSubscriber {
 export class DemoEventHub {
   private readonly _subscribers = new Map<string, DemoSseSubscriber>();
   private _matrixServer: MatrixServerService | undefined;
+  private readonly _roomHistoryLimit: number;
+
+  public constructor(roomHistoryLimit = BACKEND_ROOM_HISTORY_LIMIT) {
+    this._roomHistoryLimit = roomHistoryLimit;
+  }
 
   public setMatrixServer(server: MatrixServerService): void {
     this._matrixServer = server;
@@ -102,11 +108,32 @@ export class DemoEventHub {
             line,
             sub.inboxLines,
             sub.selectedRoomId,
+            this._roomHistoryLimit,
           ),
         );
         this.patchSubscriberInboxElement(sub);
       }
       sub.lastActivityAt = Date.now();
+    }
+  }
+
+  /** Load up to N recent server messages for a room into the subscriber cache. */
+  public hydrateRoomHistory(
+    subscriber: DemoSseSubscriber,
+    roomId: string,
+  ): void {
+    const server = this._matrixServer;
+    const trimmed = roomId.trim();
+    if (!server || !trimmed) {
+      return;
+    }
+    const events = server.getTimelineEventsForRoom(
+      subscriber.internalUserId,
+      trimmed,
+      this._roomHistoryLimit,
+    );
+    for (const event of events) {
+      this.appendInboxLine(subscriber, messageLineFromTimelineEvent(event));
     }
   }
 
@@ -128,6 +155,7 @@ export class DemoEventHub {
         rooms,
         subscriber.inboxLines,
         subscriber.selectedRoomId,
+        this._roomHistoryLimit,
       ),
     );
     patchDemoRoomUi(
@@ -139,21 +167,16 @@ export class DemoEventHub {
     subscriber.lastActivityAt = Date.now();
   }
 
-  /** Replace inbox from full timeline (stream connect / recovery). */
+  /** Prepare subscriber for live SSE (history loaded on room select). */
   public rebuildSubscriberInbox(subscriber: DemoSseSubscriber): void {
     const server = this._matrixServer;
     if (!server) {
       return;
     }
-    const messages = server.getTimelineEventsForUser(
-      subscriber.matrixUserId,
-      0,
-    );
-    subscriber.inboxLines = messages.map(messageLineFromTimelineEvent);
-    for (const event of messages) {
-      if (event.streamPos > subscriber.lastStreamPos) {
-        subscriber.lastStreamPos = event.streamPos;
-      }
+    subscriber.inboxLines = [];
+    subscriber.lastStreamPos = server.getLatestStreamPos();
+    if (subscriber.selectedRoomId) {
+      this.hydrateRoomHistory(subscriber, subscriber.selectedRoomId);
     }
     this.patchSubscriberUi(subscriber);
   }
@@ -192,6 +215,7 @@ export class DemoEventHub {
         rooms,
         subscriber.inboxLines,
         subscriber.selectedRoomId,
+        this._roomHistoryLimit,
       ),
     );
     patchDemoRoomUi(
@@ -208,6 +232,7 @@ export class DemoEventHub {
     selectedRoomId: string,
   ): void {
     subscriber.selectedRoomId = selectedRoomId;
+    this.hydrateRoomHistory(subscriber, selectedRoomId);
     this.patchSubscriberUi(subscriber);
   }
 
@@ -236,6 +261,7 @@ export class DemoEventHub {
       subscriber.writer.patchElements.bind(subscriber.writer),
       subscriber.inboxLines,
       subscriber.selectedRoomId,
+      this._roomHistoryLimit,
     );
   }
 }

@@ -106,23 +106,33 @@ export function renderRoomPickerOptionsHtml(
 
 export const ROOM_PICKER_SELECTOR = '#room-picker';
 
-/** Messages visible for the active room picker selection. */
+/** Messages visible for the active room picker selection (optional tail cap). */
 export function filterInboxForRoom(
   lines: readonly MessageLine[],
   activeRoomId: string,
+  historyLimit?: number,
 ): readonly MessageLine[] {
   const roomId = activeRoomId.trim();
   if (!roomId) {
     return [];
   }
-  return lines.filter((line) => line.room_id === roomId);
+  const filtered = lines.filter((line) => line.room_id === roomId);
+  if (
+    historyLimit !== undefined &&
+    historyLimit > 0 &&
+    filtered.length > historyLimit
+  ) {
+    return filtered.slice(-historyLimit);
+  }
+  return filtered;
 }
 
 export function renderInboxHtml(
   lines: readonly MessageLine[],
   activeRoomId = '',
+  historyLimit?: number,
 ): string {
-  const visible = filterInboxForRoom(lines, activeRoomId);
+  const visible = filterInboxForRoom(lines, activeRoomId, historyLimit);
   if (visible.length === 0) {
     return '<div id="inbox" class="inbox"><p class="empty">No messages yet — join a room and send one.</p></div>';
   }

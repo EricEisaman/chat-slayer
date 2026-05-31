@@ -605,6 +605,34 @@ export class MatrixServerService {
     return result;
   }
 
+  /**
+   * Last {@link limit} timeline events in a room visible to the caller.
+   * Requires room access (including discovered private rooms) and membership.
+   */
+  public getTimelineEventsForRoom(
+    internalUserId: string,
+    roomId: MatrixRoomId,
+    limit: number,
+  ): readonly StoredTimelineEvent[] {
+    const normalized = this.normalizeRoomId(roomId);
+    this.assertUserCanAccessRoom(internalUserId, normalized);
+    const matrixUserId = this.resolveMatrixUserId(internalUserId);
+    if (!matrixUserId || !this.isRoomMember(normalized, matrixUserId)) {
+      return [];
+    }
+    const capped = Math.max(1, Math.floor(limit));
+    const roomEvents: StoredTimelineEvent[] = [];
+    for (const event of this._timeline) {
+      if (event.roomId === normalized) {
+        roomEvents.push(event);
+      }
+    }
+    if (roomEvents.length <= capped) {
+      return roomEvents;
+    }
+    return roomEvents.slice(roomEvents.length - capped);
+  }
+
   public getLatestStreamPos(): number {
     return this._nextStreamPos - 1;
   }

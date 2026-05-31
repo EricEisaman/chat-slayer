@@ -28,8 +28,9 @@ export function buildLiveSnapshotSignalPatch(
   rooms: readonly RoomListEntry[],
   allInboxLines: readonly MessageLine[],
   selectedRoomId = '',
+  historyLimit?: number,
 ): string {
-  const inbox = filterInboxForRoom(allInboxLines, selectedRoomId);
+  const inbox = filterInboxForRoom(allInboxLines, selectedRoomId, historyLimit);
   return JSON.stringify({
     ...chatSlayerSignalPatch('room-directory', {rooms}),
     rooms,
@@ -43,11 +44,12 @@ export function buildRoomMessageInboxSignalPatch(
   line: MessageLine,
   allInboxLines: readonly MessageLine[],
   selectedRoomId: string,
+  historyLimit?: number,
 ): string {
   return JSON.stringify({
     ...JSON.parse(buildRoomMessageSignalPatch(line)),
     roomId: selectedRoomId,
-    inbox: filterInboxForRoom(allInboxLines, selectedRoomId),
+    inbox: filterInboxForRoom(allInboxLines, selectedRoomId, historyLimit),
   });
 }
 

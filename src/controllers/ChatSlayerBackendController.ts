@@ -79,6 +79,9 @@ import {
   createMatrixSyncResponseDTO,
   MatrixSyncResponseDTO,
 } from '../fi/cs/matrix/types/response/sync/MatrixSyncResponseDTO';
+import {buildRoomMessagesResponse} from '../fi/cs/matrix/server/roomTimeline';
+import {BACKEND_ROOM_HISTORY_LIMIT} from '../constants/runtime';
+import {clampRoomHistoryLimit} from '../config/roomHistory';
 import {MatrixServerService} from '../fi/cs/matrix/server/MatrixServerService';
 import {
   MATRIX_LOGIN_DUMMY,
@@ -967,6 +970,41 @@ export class ChatSlayerBackendController {
       return ResponseEntity.ok(responseDto as unknown as ReadonlyJsonObject);
     } catch (err) {
       return this._handleException('joinToRoom', err);
+    }
+  }
+
+  /**
+   * Recent room messages for history backfill (Matrix Client-Server API subset).
+   */
+  @GetMapping('/_matrix/client/v3/rooms/:roomId/messages')
+  public static async getRoomMessages(
+    @RequestHeader(MATRIX_AUTHORIZATION_HEADER_NAME, {
+      required: false,
+      defaultValue: '',
+    })
+    accessHeader: string,
+    @PathVariable('roomId', {required: true})
+    roomId = '',
+    @RequestParam('limit', RequestParamValueType.STRING)
+    limit = '',
+  ): Promise<ResponseEntity<ReadonlyJsonObject | MatrixErrorDTO>> {
+    try {
+      LOG.debug('getRoomMessages: ', roomId, limit);
+      const {userId} = await this._whoAmIFromAccessHeader(accessHeader);
+      const parsedLimit = limit ? Number.parseInt(limit, 10) : 0;
+      const effectiveLimit = clampRoomHistoryLimit(
+        parsedLimit > 0 ? parsedLimit : BACKEND_ROOM_HISTORY_LIMIT,
+        BACKEND_ROOM_HISTORY_LIMIT,
+      );
+      const events = this.getMatrixServer().getTimelineEventsForRoom(
+        userId,
+        roomId,
+        effectiveLimit,
+      );
+      const response = buildRoomMessagesResponse(events);
+      return ResponseEntity.ok(response as unknown as ReadonlyJsonObject);
+    } catch (err) {
+      return this._handleException('getRoomMessages', err);
     }
   }
 

@@ -93,6 +93,19 @@ export function messageContentFromDto(
   };
 }
 
+export function buildRoomMessagesResponse(
+  events: readonly StoredTimelineEvent[],
+): {
+  readonly chunk: ReturnType<typeof toSyncRoomEvent>[];
+  readonly start: string;
+  readonly end: string;
+} {
+  const chunk = events.map(toSyncRoomEvent);
+  const start = chunk.length > 0 ? chunk[0].event_id : '';
+  const end = chunk.length > 0 ? chunk[chunk.length - 1].event_id : '';
+  return {chunk, start, end};
+}
+
 export function isRoomMessageEventType(eventName: string): boolean {
   return (
     eventName === MatrixType.M_ROOM_MESSAGE ||

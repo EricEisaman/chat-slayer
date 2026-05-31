@@ -27,6 +27,7 @@ Copy [`.env.example`](.env.example) to `.env` for local development. **Never com
 | `BACKEND_INITIAL_USERS` | Yes | Optional `user:password` pairs, `;`-separated (demo UI defaults to `devpass123`) |
 | `BACKEND_INITIAL_ROOMS` | No | Optional public room names (comma-separated); boot-seeded at startup — requires seed users |
 | `BACKEND_PRIVATE_ROOMS` | No | Optional private room names (hidden until discovered); see [CLIENT_GUIDE.md](CLIENT_GUIDE.md) |
+| `BACKEND_ROOM_HISTORY_LIMIT` | No | Max recent messages per room on join/history fetch (default **20**) |
 | `BACKEND_EMAIL_CONFIG` | Often | SMTP URL may include credentials |
 | `BACKEND_PUBLIC_URL` | No | Public URL clients use for discovery |
 | `PORT` | No | Set by Render automatically — do not override in Dashboard |

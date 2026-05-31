@@ -3,6 +3,7 @@ import {
   type AllowedClientsConfig,
 } from '../config/allowedClients';
 import {loadDemoSseConfig, type DemoSseConfig} from '../config/demoSse';
+import {loadRoomHistoryLimit} from '../config/roomHistory';
 import {resolveBackendJwtSecret} from '../config/secrets';
 import {parseNonEmptyString} from '../fi/cs/core/types/String';
 import {LogLevel, parseLogLevel} from '../fi/cs/core/types/LogLevel';
@@ -101,3 +102,6 @@ export const ALLOWED_CLIENTS_CONFIG: AllowedClientsConfig =
 export const CLIENT_ACCESS_ENFORCED: boolean = _allowedClientsConfig.enforced;
 
 export const DEMO_SSE_CONFIG: DemoSseConfig = loadDemoSseConfig();
+
+/** Max recent messages per room on history fetch (demo join/switch, GET /messages). */
+export const BACKEND_ROOM_HISTORY_LIMIT: number = loadRoomHistoryLimit();

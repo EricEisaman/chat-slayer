@@ -171,6 +171,25 @@ Example response:
 
 Single-room `POST /_matrix/client/r0/createRoom` still returns **409** if `name` is already taken (strict create).
 
+### Room message history (server-wide)
+
+Set `BACKEND_ROOM_HISTORY_LIMIT=20` (default **20**, max 500) for how many recent messages are returned per room when loading history.
+
+| Client | Behavior |
+|--------|----------|
+| Demo UI | Selecting **Active room** (join/switch) loads the last N messages for that room from the server |
+| Matrix API | `GET /_matrix/client/v3/rooms/{roomId}/messages?limit=N` — optional `limit` (clamped to server max) |
+
+`/sync` remains **incremental** (new events since `since` only). Use `/messages` or demo join for backfill.
+
+```bash
+curl -s "http://localhost:8008/_matrix/client/v3/rooms/!lobby:localhost/messages?limit=20" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "X-Chat-Slayer-Client-Id: ops-cli"
+```
+
+Example response shape: `{ "chunk": [ …events ], "start": "$1", "end": "$20" }`.
+
 ## Create an account (Matrix registration)
 
 Registration follows the [Matrix Client-Server API](https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3register): the first request **without** `auth` returns **HTTP 401** with `flows` and `session`; the client retries with `auth: { type: "m.login.dummy", session }` plus `username` and `password` in the body (not as a UIA password stage).
