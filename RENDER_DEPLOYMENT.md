@@ -1,5 +1,9 @@
 # Deploying Chat Slayer on Render (free web service)
 
+> **Deploy failed with `BACKEND_TLS_FINGERPRINT_SHA256 is required`?**  
+> Render Dashboard → **Environment** → paste from [`scripts/render-dashboard-phase1.env`](scripts/render-dashboard-phase1.env) (`BACKEND_TLS_PIN_ENFORCED=false`) → **Save, rebuild, and deploy**.  
+> After the service is **Live**, paste [`scripts/render-dashboard-phase2.env`](scripts/render-dashboard-phase2.env) for TLS fingerprint verification (or run `npm run render:gen:env -- --url https://<your-service>.onrender.com --write`).
+
 This guide matches the repo’s [render.yaml](render.yaml) blueprint and how the app reads configuration at **runtime** (never from the Vite build).
 
 ## Free-tier constraints (what the app expects)
