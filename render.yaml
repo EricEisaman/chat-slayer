@@ -20,6 +20,9 @@ services:
         value: INFO
       - key: FEDERATION_ENABLED
         value: "false"
+      # TLS fingerprint pinning — phase 1: boot without pin (see RENDER_DEPLOYMENT.md)
+      - key: BACKEND_TLS_PIN_ENFORCED
+        value: "false"
       # Set in Dashboard (not in git): BACKEND_JWT_SECRET (Secret), BACKEND_PUBLIC_URL,
       # optional BACKEND_INITIAL_USERS (Secret), BACKEND_INITIAL_ROOMS, BACKEND_PRIVATE_ROOMS,
       # BACKEND_EMAIL_CONFIG (Secret).

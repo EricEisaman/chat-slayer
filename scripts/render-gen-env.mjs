@@ -578,7 +578,7 @@ function buildPlainFileContent(host, bundle) {
   return lines.join('\n');
 }
 
-function main() {
+async function main() {
   const opts = parseArgs(process.argv.slice(2));
   if (opts.help) {
     printHelp();
