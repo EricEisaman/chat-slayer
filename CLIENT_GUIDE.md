@@ -318,7 +318,7 @@ curl -s "http://localhost:8008/_matrix/client/r0/login" -X POST -H "Content-Type
 | Problem | Cause | Fix |
 |---------|--------|-----|
 | CORS error in browser | Origin not in `origins` for that `id` | Add exact origin (scheme + host + port). |
-| CORS error on `/health` only | Old server without health CORS | Redeploy chat-slayer; `/health` echoes `Origin` for CORS (no client id). |
+| CORS error on `/health` only | GET missing `Access-Control-Allow-Origin` | Redeploy chat-slayer; browser warmup needs **GET** (not only OPTIONS) to echo `Origin` on `/health`. |
 | `403 Client not allowed` | Missing/wrong `X-Chat-Slayer-Client-Id` | Match an `id` in `ALLOWED_CLIENTS`. |
 | `403` with Origin message | Browser origin not listed | Add origin to the client entry. |
 | Server exits on startup (production) | Empty/invalid `ALLOWED_CLIENTS` | Set valid JSON with ≥1 client. |

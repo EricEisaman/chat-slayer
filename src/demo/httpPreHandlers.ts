@@ -7,13 +7,17 @@ import {tryHandleDemoRequest} from './DemoHttpHandler';
 export type HttpPreHandlerResult = 'continue' | 'handled';
 
 /**
- * Health, demo API + page, demo static assets, then client access gate (Matrix API).
+ * Client access gate (CORS + client id), then health, demo API, well-known, static, Matrix.
  */
 export async function handleHttpPreRequest(
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<HttpPreHandlerResult> {
   applySecurityResponseHeaders(res);
+  const gateResult = await handleClientAccessGate(req, res);
+  if (gateResult === 'handled') {
+    return 'handled';
+  }
   if (tryServeHealth(req, res)) {
     return 'handled';
   }
@@ -26,5 +30,5 @@ export async function handleHttpPreRequest(
   if (tryServeDemoStatic(req, res)) {
     return 'handled';
   }
-  return handleClientAccessGate(req, res);
+  return 'continue';
 }

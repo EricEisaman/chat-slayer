@@ -195,6 +195,7 @@ export async function handleClientAccessGate(
 
   if (decision.corsOrigin) {
     setCorsAllowOrigin(res, decision.corsOrigin);
+    applyCorsHeaders(res, decision.corsOrigin);
   }
 
   if (req.method?.toUpperCase() === 'OPTIONS') {
